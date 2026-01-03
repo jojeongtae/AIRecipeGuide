@@ -1,0 +1,40 @@
+# FastAPI & Server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# LangGraph & LangChain
+langgraph==0.0.20
+langchain==0.1.0
+langchain-openai==0.0.2
+langchain-community==0.0.10
+
+# OpenAI
+openai>=1.0.0
+
+# Database (currently unused)
+# psycopg2-binary==2.9.9
+# sqlalchemy==2.0.23
+# alembic==1.12.1
+
+# Data Validation (Python 3.13 compatible)
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+
+# HTTP Client
+httpx==0.25.2
+requests==2.31.0
+
+# Web Scraping
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Utilities
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Search API
+tavily-python>=0.3.0

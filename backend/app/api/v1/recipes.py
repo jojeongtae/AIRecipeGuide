@@ -215,7 +215,7 @@ async def get_recipe_by_menu(
         
         recipes = search_recipes_by_name(
             menu_name=menu_name,
-            max_results=5,  # 더 많은 결과 가져오기
+            max_results=3,  # 성능 최적화: 3개로 제한
             user_ingredients=user_ingredients_list
         )
         
@@ -225,9 +225,46 @@ async def get_recipe_by_menu(
                 error=f"'{menu_name}' 레시피를 찾을 수 없습니다."
             )
         
-        # 모든 레시피에 매칭률 계산 및 추가
+        # 모든 레시피에 매칭률 계산 및 추가 (병렬 처리)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        def calculate_match_rate(recipe):
+            """레시피 매칭률 계산 (별도 함수로 분리)"""
+            recipe_copy = recipe.copy()
+            
+            # serving_size 필드 제거 (항상 1인분 기준, 표시하지 않음)
+            if "serving_size" in recipe_copy:
+                del recipe_copy["serving_size"]
+            
+            # 재료 비교하여 매칭률 계산
+            ingredient_check_result = check_ingredients_simple(
+                required_ingredients=recipe_copy.get("ingredients", []),
+                user_ingredients=user_ingredients_list,
+                recipe_name=recipe_copy.get("name", "")
+            )
+            
+            # 매칭률 정보 추가
+            recipe_copy["match_rate"] = ingredient_check_result["match_rate"]
+            recipe_copy["matched_ingredients"] = ingredient_check_result["matched_ingredients"]
+            recipe_copy["missing_ingredients"] = ingredient_check_result["missing_ingredients"]
+            
+            return recipe_copy
+        
+        # 병렬 처리로 매칭률 계산 (성능 최적화)
         recipes_with_match_rate = []
-        for recipe in recipes:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            future_to_recipe = {
+                executor.submit(calculate_match_rate, recipe): recipe
+                for recipe in recipes
+            }
+            
+            for future in as_completed(future_to_recipe):
+                try:
+                    recipe_with_match = future.result()
+                    recipes_with_match_rate.append(recipe_with_match)
+                except Exception as e:
+                    logger.error(f"매칭률 계산 오류: {e}")
+                    continue
             recipe_copy = recipe.copy()
             
             # serving_size 필드 제거 (항상 1인분 기준, 표시하지 않음)

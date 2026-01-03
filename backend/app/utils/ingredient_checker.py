@@ -76,9 +76,11 @@ def check_ingredients_simple(
                 break
         
         # 2순위: LLM 매칭 (정규화 매칭 실패 시)
+        # 메뉴 검색 시 성능 최적화: LLM 호출 제한 (첫 번째 매칭만 시도)
         if not is_matched and settings.OPENAI_API_KEY:
-            for user_ing in user_ingredients:
-                user_ing_name = normalize_for_matching(user_ing)
+            # 첫 번째 user_ingredient만 LLM 호출 (성능 최적화)
+            if user_ingredients:
+                user_ing_name = normalize_for_matching(user_ingredients[0])
                 llm_result = check_ingredient_substitution_with_llm(
                     user_ingredient=user_ing_name,
                     required_ingredient=required_ing_name,
@@ -88,11 +90,10 @@ def check_ingredients_simple(
                 if llm_result.get("can_substitute", False):
                     is_matched = True
                     substitution_guidances.append({
-                        "user_ingredient": user_ing,
+                        "user_ingredient": user_ingredients[0],
                         "required_ingredient": required_ing,
                         "guidance": llm_result.get("reason", "")
                     })
-                    break
         
         # 매칭 결과 분류
         if is_matched:

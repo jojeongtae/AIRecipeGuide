@@ -80,6 +80,13 @@ class GraphState(TypedDict):
     crawler_recipes: Optional[List[Dict[str, Any]]]  # 크롤링 결과
     tavily_recipes: Optional[List[Dict[str, Any]]]  # Tavily 검색 결과
     llm_recipes: Optional[List[Dict[str, Any]]]  # LLM 생성 결과
+    # Phase 3 검증 관련 필드 (Deep Research 재귀 루프용)
+    nutrition_validation_passed: Optional[bool]  # 영양 정보 검증 통과 여부
+    nutrition_validation_issues: Optional[List[str]]  # 영양 정보 검증 이슈
+    nutrition_validation_iteration: int  # 영양 정보 검증 반복 횟수
+    cooking_order_validation_passed: Optional[bool]  # 조리 순서 검증 통과 여부
+    cooking_order_validation_issues: Optional[List[str]]  # 조리 순서 검증 이슈
+    cooking_order_validation_iteration: int  # 조리 순서 검증 반복 횟수
     
     # 페르소나 및 지능형 매칭 관련 필드
     matching_score: Optional[float]  # 지능형 매칭 점수 (0.0 ~ 100.0)

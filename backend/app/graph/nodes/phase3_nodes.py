@@ -64,6 +64,7 @@ def analyze_nutrition(state: GraphState) -> Dict[str, Any]:
     LLM을 사용하여 레시피의 영양 정보를 추정
     """
     selected_recipe = state.get("selected_recipe")
+    nutrition_validation_iteration = state.get("nutrition_validation_iteration", 0)
     
     if not selected_recipe:
         logger.error("analyze_nutrition: selected_recipe가 없습니다.")
@@ -71,12 +72,18 @@ def analyze_nutrition(state: GraphState) -> Dict[str, Any]:
     
     # 크롤링된 레시피에 영양 정보가 있으면 사용
     if selected_recipe.get("nutrition"):
-        return {"nutrition_info": selected_recipe["nutrition"]}
+        return {
+            "nutrition_info": selected_recipe["nutrition"],
+            "nutrition_validation_iteration": nutrition_validation_iteration + 1
+        }
     
     # LLM을 사용하여 영양 정보 계산 (메뉴명과 재료 기반)
     try:
         nutrition_info = _calculate_nutrition_with_llm(selected_recipe)
-        return {"nutrition_info": nutrition_info}
+        return {
+            "nutrition_info": nutrition_info,
+            "nutrition_validation_iteration": nutrition_validation_iteration + 1
+        }
     except Exception as e:
         logger.error(f"영양 정보 계산 실패: {e}")
         # 기본값 반환
@@ -86,7 +93,8 @@ def analyze_nutrition(state: GraphState) -> Dict[str, Any]:
                 "carbohydrates": 45,
                 "protein": 15,
                 "fat": 12,
-            }
+            },
+            "nutrition_validation_iteration": nutrition_validation_iteration + 1
         }
 
 
@@ -175,6 +183,7 @@ def optimize_cooking_order(state: GraphState) -> Dict[str, Any]:
     """
     selected_recipe = state.get("selected_recipe")
     substitution_suggestions = state.get("substitution_suggestions", [])
+    cooking_order_validation_iteration = state.get("cooking_order_validation_iteration", 0)
     
     if not selected_recipe:
         logger.error("optimize_cooking_order: selected_recipe가 없습니다.")
@@ -231,7 +240,10 @@ def optimize_cooking_order(state: GraphState) -> Dict[str, Any]:
             for i, step in enumerate(steps)
         ]
     
-    return {"optimized_steps": optimized_steps}
+    return {
+        "optimized_steps": optimized_steps,
+        "cooking_order_validation_iteration": cooking_order_validation_iteration + 1
+    }
 
 
 
@@ -422,11 +434,14 @@ def validate_nutrition(state: GraphState) -> Dict[str, Any]:
             issues.append(f"칼로리 계산이 일치하지 않습니다: {calories}kcal vs {calculated_calories:.0f}kcal")
     
     if not is_valid:
-        logger.warning(f"영양 정보 검증 실패: {', '.join(issues)} (그래도 진행)")
-        # 검증 실패해도 그냥 진행 (속도 우선)
+        logger.warning(f"영양 정보 검증 실패: {', '.join(issues)}")
     
-    logger.info("영양 정보 검증 통과")
-    return state
+    logger.info(f"영양 정보 검증: {'통과' if is_valid else '실패'}")
+    return {
+        **state,
+        "nutrition_validation_passed": is_valid,
+        "nutrition_validation_issues": issues if not is_valid else None
+    }
 
 
 
@@ -474,11 +489,14 @@ def validate_cooking_order(state: GraphState) -> Dict[str, Any]:
         issues.append("첫 단계에 재료 준비 과정이 없을 수 있습니다")
     
     if not is_valid:
-        logger.warning(f"조리 순서 검증 실패: {', '.join(issues)} (그래도 진행)")
-        # 검증 실패해도 그냥 진행 (속도 우선)
+        logger.warning(f"조리 순서 검증 실패: {', '.join(issues)}")
     
-    logger.info("조리 순서 검증 통과")
-    return state
+    logger.info(f"조리 순서 검증: {'통과' if is_valid else '실패'}")
+    return {
+        **state,
+        "cooking_order_validation_passed": is_valid,
+        "cooking_order_validation_issues": issues if not is_valid else None
+    }
 
 
 

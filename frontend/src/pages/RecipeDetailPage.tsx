@@ -73,9 +73,9 @@ const RecipeDetailPage = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <button
           onClick={() => navigate(-1)}
           className="px-4 py-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors font-medium"
@@ -115,16 +115,16 @@ const RecipeDetailPage = () => {
       )}
 
       {/* 레시피 상세 */}
-      <div className="bg-white rounded-2xl shadow-xl p-8 animate-fade-in border border-gray-100">
-        <div className="mb-6 pb-6 border-b-2 border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3">
-                <span className="text-4xl">🍲</span>
-                {recipe.name}
+      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 md:p-8 animate-fade-in border border-gray-100">
+        <div className="mb-4 sm:mb-6 pb-4 sm:pb-6 border-b-2 border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2 sm:gap-3 break-words">
+                <span className="text-2xl sm:text-3xl md:text-4xl">🍲</span>
+                <span>{recipe.name}</span>
               </h2>
               {recipe.category && (
-                <span className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full text-sm font-medium">
+                <span className="bg-indigo-100 text-indigo-700 px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-medium self-start sm:self-auto">
                   {recipe.category}
                 </span>
               )}
@@ -163,7 +163,7 @@ const RecipeDetailPage = () => {
           
           {/* 레시피 대표 이미지 */}
           {recipe.image && (
-            <div className="w-full h-64 rounded-xl overflow-hidden bg-gray-200 mb-4">
+            <div className="w-full h-48 sm:h-56 md:h-64 rounded-xl overflow-hidden bg-gray-200 mb-4">
               <img
                 src={recipe.image}
                 alt={recipe.name}
@@ -258,8 +258,8 @@ const RecipeDetailPage = () => {
 
         {/* 요리 순서 */}
         {fullData?.cooking_steps && (
-          <div className="mb-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-6 border-2 border-yellow-100">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <div className="mb-6 sm:mb-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 sm:p-6 border-2 border-yellow-100">
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <span className="text-2xl">👨‍🍳</span>
               요리 순서
             </h3>

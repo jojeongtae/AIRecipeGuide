@@ -103,13 +103,13 @@ const RecipeResultsPage = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3 mb-2">
-            <span className="text-4xl">🍽️</span>
-            {menuName ? `"${menuName}" 검색 결과` : '추천 레시피'} ({recipes.length}개)
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+        <div className="flex-1">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2 sm:gap-3 mb-2">
+            <span className="text-2xl sm:text-3xl md:text-4xl">🍽️</span>
+            <span className="break-words">{menuName ? `"${menuName}" 검색 결과` : '추천 레시피'} ({recipes.length}개)</span>
           </h2>
           {menuName && (
             <p className="text-gray-600 text-sm mt-1">
@@ -124,7 +124,7 @@ const RecipeResultsPage = () => {
         </div>
         <button
           onClick={() => navigate('/')}
-          className="px-4 py-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors font-medium"
+          className="px-4 py-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors font-medium self-start sm:self-auto"
         >
           ← 다시 검색
         </button>
@@ -169,9 +169,9 @@ const RecipeResultsPage = () => {
             style={{ animationDelay: `${index * 0.1}s` }}
             onClick={() => handleSelectRecipe(index)}
           >
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               {/* 레시피 이미지 */}
-              <div className="flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-gray-200">
+              <div className="flex-shrink-0 w-full sm:w-32 h-48 sm:h-32 rounded-lg overflow-hidden bg-gray-200">
                 {recipe.image ? (
                   <img
                     src={recipe.image}
@@ -194,13 +194,13 @@ const RecipeResultsPage = () => {
               
               {/* 레시피 정보 */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span className="text-2xl">👨‍🍳</span>
-                    {recipe.name}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2 break-words">
+                    <span className="text-xl sm:text-2xl">👨‍🍳</span>
+                    <span>{recipe.name}</span>
                   </h3>
                   {recipe.category && (
-                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium">
+                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium self-start sm:self-auto">
                       {recipe.category}
                     </span>
                   )}
@@ -216,8 +216,11 @@ const RecipeResultsPage = () => {
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
                       매칭도: {(() => {
                         const rate = recipe.match_rate ?? recipe.match_score ?? 0;
-                        // match_rate가 1보다 크면 이미 퍼센트 값이므로 그대로 사용, 아니면 100 곱함
-                        return Math.round(rate > 1 ? rate : rate * 100);
+                        // match_rate는 0.0~1.0 범위이므로 항상 100을 곱함
+                        // 만약 이미 100을 곱한 값(100 이상)이면 그대로 사용
+                        const percentage = rate >= 1 ? rate : rate * 100;
+                        // 100%를 초과하는 경우 최대 100%로 제한
+                        return Math.round(Math.min(percentage, 100));
                       })()}%
                     </span>
                   )}

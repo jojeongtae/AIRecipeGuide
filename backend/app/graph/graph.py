@@ -113,15 +113,29 @@ def should_retry_validation(state: GraphState) -> str:
 
 
 def should_retry_nutrition(state: GraphState) -> str:
-    """영양 정보 검증 실패 시 재분석 여부 결정 - 검증 완화"""
-    # 검증 실패해도 그냥 진행 (속도 우선)
-    return "optimize_cooking_order"
+    """영양 정보 검증 실패 시 재분석 여부 결정 (최대 2회 재시도)"""
+    validation_passed = state.get("nutrition_validation_passed", True)
+    validation_iteration = state.get("nutrition_validation_iteration", 0)
+    
+    # 검증 통과 또는 최대 재시도 횟수 초과 시 다음 단계로
+    if validation_passed or validation_iteration >= 2:
+        return "optimize_cooking_order"
+    
+    # 검증 실패 시 재분석
+    return "analyze_nutrition"
 
 
 def should_retry_cooking_order(state: GraphState) -> str:
-    """조리 순서 검증 실패 시 재최적화 여부 결정 - 검증 완화"""
-    # 검증 실패해도 그냥 진행 (속도 우선)
-    return "validate_recipe_completeness"
+    """조리 순서 검증 실패 시 재최적화 여부 결정 (최대 2회 재시도)"""
+    validation_passed = state.get("cooking_order_validation_passed", True)
+    validation_iteration = state.get("cooking_order_validation_iteration", 0)
+    
+    # 검증 통과 또는 최대 재시도 횟수 초과 시 다음 단계로
+    if validation_passed or validation_iteration >= 2:
+        return "validate_recipe_completeness"
+    
+    # 검증 실패 시 재최적화
+    return "optimize_cooking_order"
 
 
 

@@ -52,8 +52,8 @@ const RecipeResultsPage = () => {
       const ingredientsString = selectedRecipe.ingredients?.join(', ') || ''
       const response = await selectRecipe(
         index,
-        ingredientsString,
-        2
+        ingredientsString
+        // 2 // servingSize 주석처리 (1인분 고정)
       )
 
       clearTimeout(stageTimer)

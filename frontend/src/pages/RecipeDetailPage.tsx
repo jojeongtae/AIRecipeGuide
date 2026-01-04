@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { selectRecipe } from '../services/api'
+// import { selectRecipe } from '../services/api' // 주석처리 (1인분 고정)
 
 const RecipeDetailPage = () => {
   const navigate = useNavigate()
@@ -8,12 +8,12 @@ const RecipeDetailPage = () => {
   const { recipeData, searchSource } = (location.state as any) || {}
   
   // const [servingSize, setServingSize] = useState<number>(2)
-  const [loading, setLoading] = useState(false)
-  const [loadingStage, setLoadingStage] = useState<string>('')
-  const [loadingProgress, setLoadingProgress] = useState<number>(0)
-  const [error, setError] = useState<string | null>(null)
-  const [recipe, setRecipe] = useState(recipeData?.recipe || null)
-  const [fullData, setFullData] = useState(recipeData || null)
+  const [loading] = useState(false)
+  const [loadingStage] = useState<string>('')
+  const [loadingProgress] = useState<number>(0)
+  const [error] = useState<string | null>(null)
+  const [recipe] = useState(recipeData?.recipe || null)
+  const [fullData] = useState(recipeData || null)
 
   useEffect(() => {
     if (!recipeData) {

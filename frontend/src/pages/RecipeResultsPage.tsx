@@ -14,6 +14,22 @@ const RecipeResultsPage = () => {
   const handleSelectRecipe = async (index: number) => {
     if (!recipes[index]) return
 
+    // 메뉴 이름 기반 검색 결과인 경우 레시피 정보를 직접 전달
+    if (menuName) {
+      const selectedRecipe = recipes[index]
+      // 레시피 상세 페이지 형식으로 변환
+      navigate('/recipe', { 
+        state: { 
+          recipeData: {
+            recipe: selectedRecipe
+          },
+          searchSource: searchSource
+        } 
+      })
+      return
+    }
+
+    // 재료 기반 검색 결과인 경우 기존 로직 사용
     setLoading(true)
     setError(null)
     setLoadingStage('레시피 검색 중...')
@@ -177,7 +193,11 @@ const RecipeResultsPage = () => {
                   </span>
                   {(recipe.match_score || recipe.match_rate !== undefined) && (
                     <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
-                      매칭도: {Math.round((recipe.match_rate ?? recipe.match_score ?? 0) * 100)}%
+                      매칭도: {(() => {
+                        const rate = recipe.match_rate ?? recipe.match_score ?? 0;
+                        // match_rate가 1보다 크면 이미 퍼센트 값이므로 그대로 사용, 아니면 100 곱함
+                        return Math.round(rate > 1 ? rate : rate * 100);
+                      })()}%
                     </span>
                   )}
                 </div>

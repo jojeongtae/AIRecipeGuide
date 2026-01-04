@@ -285,8 +285,14 @@ async def get_recipe_by_menu(
             
             recipes_with_match_rate.append(recipe_copy)
         
-        # 매칭률 순으로 정렬 (높은 순)
-        recipes_with_match_rate.sort(key=lambda x: x.get("match_rate", 0.0), reverse=True)
+        # 정렬: 레시피 이름에 메뉴 이름이 포함된 것을 우선, 그 다음 매칭률 순
+        def sort_key(recipe):
+            name = recipe.get("name", "").lower()
+            menu_lower = menu_name.lower()
+            name_match = 1 if menu_lower in name else 0  # 이름에 메뉴명 포함되면 1, 아니면 0
+            match_rate = recipe.get("match_rate", 0.0)
+            return (name_match, match_rate)  # 튜플 정렬: 첫 번째 요소 우선, 같으면 두 번째 요소
+        recipes_with_match_rate.sort(key=sort_key, reverse=True)
         
         # 응답 데이터 구성 (레시피 목록 반환)
         result_data = {

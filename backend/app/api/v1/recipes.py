@@ -4,7 +4,7 @@ Recipe API Endpoints
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from app.models.state import GraphState, Difficulty
+from app.models.state import GraphState, Difficulty, UserPersona
 from app.graph.graph import recipe_graph
 
 router = APIRouter()
@@ -70,6 +70,7 @@ class RecipeRequest(BaseModel):
     dietary_preferences: Optional[List[str]] = None
     serving_size: Optional[int] = None  # 인분 수 (기본값: 레시피 원본)
     category: Optional[str] = None  # 카테고리 (메인요리, 후식, 반찬, 국/찌개 등)
+    user_persona: Optional[str] = None  # 사용자 페르소나 (beginner/expert)
 
 
 class RecipeResponse(BaseModel):
@@ -85,13 +86,22 @@ async def recommend_recipe(request: RecipeRequest):
     재료 기반 레시피 추천
     """
     try:
+        # user_persona 처리
+        user_persona_enum = None
+        if request.user_persona:
+            try:
+                user_persona_enum = UserPersona(request.user_persona)
+            except ValueError:
+                user_persona_enum = UserPersona.BEGINNER  # 기본값
+        
         initial_state = create_initial_state(
             user_input=request.ingredients,
             difficulty=request.difficulty,
             max_cooking_time=request.max_cooking_time,
             dietary_preferences=request.dietary_preferences,
             serving_size=request.serving_size,
-            category=request.category
+            category=request.category,
+            user_persona=user_persona_enum
         )
         
         from app.graph.nodes import input_ingredients, analyze_ingredients, search_recipes, compare_and_select_source, filter_recipes
@@ -151,6 +161,7 @@ async def select_recipe(
     recipe_index: int = Query(..., description="선택한 레시피 인덱스"),
     ingredients: str = Query(..., description="재료 목록 (쉼표로 구분)"),
     serving_size: Optional[int] = Query(None, description="인분 수"),
+    user_persona: Optional[str] = Query(None, description="사용자 페르소나 (beginner/expert)"),
 ):
     """
     여러 레시피 중 하나 선택
@@ -159,9 +170,18 @@ async def select_recipe(
         import logging
         logger = logging.getLogger(__name__)
         
+        # user_persona 처리
+        user_persona_enum = None
+        if user_persona:
+            try:
+                user_persona_enum = UserPersona(user_persona)
+            except ValueError:
+                user_persona_enum = UserPersona.BEGINNER  # 기본값
+        
         initial_state = create_initial_state(
             user_input=ingredients,
-            serving_size=serving_size
+            serving_size=serving_size,
+            user_persona=user_persona_enum
         )
         initial_state["user_choice"] = recipe_index
         

@@ -5,7 +5,7 @@ import { selectRecipe } from '../services/api'
 const RecipeResultsPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { recipes = [], searchSource = null, menuName = null } = (location.state as any) || {}
+  const { recipes = [], searchSource = null, menuName = null, userPersona = 'beginner' } = (location.state as any) || {}
   
   const [loading, setLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState<string>('')
@@ -52,7 +52,8 @@ const RecipeResultsPage = () => {
       const ingredientsString = selectedRecipe.ingredients?.join(', ') || ''
       const response = await selectRecipe(
         index,
-        ingredientsString
+        ingredientsString,
+        userPersona
         // 2 // servingSize 주석처리 (1인분 고정)
       )
 

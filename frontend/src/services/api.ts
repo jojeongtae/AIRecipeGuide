@@ -17,6 +17,7 @@ export interface RecipeRequest {
   dietary_preferences?: string[] | null
   serving_size?: number | null
   category?: string | null
+  user_persona?: string | null
 }
 
 export interface RecipeResponse {
@@ -49,11 +50,14 @@ export const recommendRecipe = async (request: RecipeRequest): Promise<RecipeRes
   return response.data
 }
 
-export const selectRecipe = async (recipeIndex: number, ingredients: string/*, servingSize?: number*/): Promise<RecipeResponse> => {
+export const selectRecipe = async (recipeIndex: number, ingredients: string, userPersona?: string/*, servingSize?: number*/): Promise<RecipeResponse> => {
   const params = new URLSearchParams({
     recipe_index: recipeIndex.toString(),
     ingredients: ingredients
   })
+  if (userPersona) {
+    params.append('user_persona', userPersona)
+  }
   // if (servingSize) {
   //   params.append('serving_size', servingSize.toString())
   // }

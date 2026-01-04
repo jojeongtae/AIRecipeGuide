@@ -7,9 +7,10 @@ const RecipeDetailPage = () => {
   const location = useLocation()
   const { recipeData, searchSource } = (location.state as any) || {}
   
-  const [servingSize, setServingSize] = useState<number>(2)
+  // const [servingSize, setServingSize] = useState<number>(2)
   const [loading, setLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState<string>('')
+  const [loadingProgress, setLoadingProgress] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
   const [recipe, setRecipe] = useState(recipeData?.recipe || null)
   const [fullData, setFullData] = useState(recipeData || null)
@@ -20,35 +21,39 @@ const RecipeDetailPage = () => {
     }
   }, [recipeData, navigate])
 
-  const handleServingSizeChange = async (newSize: number) => {
-    if (newSize < 1 || newSize > 20 || newSize === servingSize) return
+  // const handleServingSizeChange = async (newSize: number) => {
+  //   if (newSize < 1 || newSize > 20 || newSize === servingSize) return
 
-    setServingSize(newSize)
-    setLoading(true)
-    setLoadingStage('인분 수 조정 중...')
-    setError(null)
+  //   setServingSize(newSize)
+  //   setLoading(true)
+  //   setLoadingStage('인분 수 조정 중...')
+  //   setLoadingProgress(50)
+  //   setError(null)
 
-    try {
-      const ingredientsString = recipe?.ingredients?.join(', ') || ''
-      const response = await selectRecipe(
-        0, // 이미 선택된 레시피이므로 인덱스는 중요하지 않음
-        ingredientsString,
-        newSize
-      )
+  //   try {
+  //     const ingredientsString = recipe?.ingredients?.join(', ') || ''
+  //     const response = await selectRecipe(
+  //       0, // 이미 선택된 레시피이므로 인덱스는 중요하지 않음
+  //       ingredientsString,
+  //       newSize
+  //     )
 
-      if (response.success && response.data) {
-        setFullData(response.data)
-        setRecipe(response.data.recipe)
-      } else {
-        setError(response.error || '인분 수 조정에 실패했습니다.')
-      }
-    } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
-      setLoadingStage('')
-    }
-  }
+  //     if (response.success && response.data) {
+  //       setLoadingProgress(100)
+  //       setFullData(response.data)
+  //       setRecipe(response.data.recipe)
+  //     } else {
+  //       setError(response.error || '인분 수 조정에 실패했습니다.')
+  //       setLoadingProgress(0)
+  //     }
+  //   } catch (err: any) {
+  //     setError(err.message || '오류가 발생했습니다.')
+  //     setLoadingProgress(0)
+  //   } finally {
+  //     setLoading(false)
+  //     setLoadingStage('')
+  //   }
+  // }
 
   if (!recipe) {
     return (
@@ -88,9 +93,23 @@ const RecipeDetailPage = () => {
 
       {loading && loadingStage && (
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 animate-fade-in border border-gray-100">
-          <div className="flex items-center justify-center gap-3 py-8">
-            <span className="animate-spin text-3xl">⏳</span>
-            <span className="text-xl font-semibold text-gray-700">{loadingStage}</span>
+          <div className="flex flex-col items-center justify-center gap-4 py-6">
+            <div className="flex items-center gap-3">
+              <span className="animate-spin text-3xl">⏳</span>
+              <span className="text-xl font-semibold text-gray-700">{loadingStage}</span>
+            </div>
+            {/* 진행률 게이지 바 */}
+            <div className="w-full max-w-md">
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-orange-500 to-pink-500 h-3 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                ></div>
+              </div>
+              <div className="text-center mt-2 text-sm text-gray-500">
+                {loadingProgress}%
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -111,8 +130,8 @@ const RecipeDetailPage = () => {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {/* 인분 수 조정 */}
-              <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+              {/* 인분 수 조정 - 주석처리 (1인분 고정) */}
+              {/* <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                 <span className="text-sm font-medium text-gray-700">인분:</span>
                 <div className="flex items-center gap-1">
                   <button
@@ -133,7 +152,7 @@ const RecipeDetailPage = () => {
                     +
                   </button>
                 </div>
-              </div>
+              </div> */}
               {searchSource && (
                 <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full font-medium">
                   {searchSource}

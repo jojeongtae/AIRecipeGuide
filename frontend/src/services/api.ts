@@ -49,14 +49,14 @@ export const recommendRecipe = async (request: RecipeRequest): Promise<RecipeRes
   return response.data
 }
 
-export const selectRecipe = async (recipeIndex: number, ingredients: string, servingSize?: number): Promise<RecipeResponse> => {
+export const selectRecipe = async (recipeIndex: number, ingredients: string/*, servingSize?: number*/): Promise<RecipeResponse> => {
   const params = new URLSearchParams({
     recipe_index: recipeIndex.toString(),
     ingredients: ingredients
   })
-  if (servingSize) {
-    params.append('serving_size', servingSize.toString())
-  }
+  // if (servingSize) {
+  //   params.append('serving_size', servingSize.toString())
+  // }
   const response = await apiClient.post<RecipeResponse>(
     `/api/v1/recipes/select?${params.toString()}`
   )

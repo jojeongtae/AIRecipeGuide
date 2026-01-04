@@ -19,7 +19,7 @@ const RecipeRecommendation = () => {
   const [error, setError] = useState<string | null>(null)
   const [recipeOptions, setRecipeOptions] = useState<any[]>([])
   const [searchSource, setSearchSource] = useState<string | null>(null)
-  const [servingSize, setServingSize] = useState<number>(2)
+  // const [servingSize, setServingSize] = useState<number>(2)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
@@ -163,7 +163,7 @@ const RecipeRecommendation = () => {
     }, 6000) // 6초 후
 
     try {
-      const response = await selectRecipe(index, getIngredientsString(), servingSize)
+      const response = await selectRecipe(index, getIngredientsString()/*, servingSize*/)
       
       // 타이머 정리
       clearTimeout(stageTimer)
@@ -173,10 +173,10 @@ const RecipeRecommendation = () => {
         setResult(response.data)
         setRecipeOptions([])
         setLoadingStage('')
-        // 레시피의 기본 인분 수로 servingSize 업데이트
-        if (response.data.recipe?.serving_size) {
-          setServingSize(response.data.recipe.serving_size)
-        }
+        // 레시피의 기본 인분 수로 servingSize 업데이트 - 주석처리 (1인분 고정)
+        // if (response.data.recipe?.serving_size) {
+        //   setServingSize(response.data.recipe.serving_size)
+        // }
       } else {
         setError(response.error || '레시피를 불러올 수 없습니다.')
         setLoadingStage('')
@@ -191,32 +191,32 @@ const RecipeRecommendation = () => {
     }
   }
 
-  const handleServingSizeChange = async (newSize: number) => {
-    if (newSize < 1 || newSize > 20) return
-    setServingSize(newSize)
-    
-    // 레시피가 선택된 상태에서 인분 수 변경 시 재요청
-    if (result?.recipe && recipeOptions.length === 0) {
-      // 현재 선택된 레시피의 인덱스를 찾아서 다시 요청
-      // 이 경우는 이미 상세 화면이므로, serving_size만 업데이트하여 재요청
-      setLoading(true)
-      setLoadingStage('인분 수 조정 중...')
-      try {
-        // 원래 선택했던 레시피 인덱스를 찾기 어려우므로, 
-        // 현재 result의 recipe 정보를 기반으로 serving_size만 업데이트
-        // recipes가 없으면 전체 검색이 실행되지만, 이미 상세 화면이므로 0번 인덱스 사용
-        const response = await selectRecipe(0, getIngredientsString(), newSize)
-        if (response.success && response.data) {
-          setResult(response.data)
-        }
-      } catch (err: any) {
-        setError(err.message || '인분 수 조정 중 오류가 발생했습니다.')
-      } finally {
-        setLoading(false)
-        setLoadingStage('')
-      }
-    }
-  }
+  // const handleServingSizeChange = async (newSize: number) => {
+  //   if (newSize < 1 || newSize > 20) return
+  //   setServingSize(newSize)
+  //   
+  //   // 레시피가 선택된 상태에서 인분 수 변경 시 재요청
+  //   if (result?.recipe && recipeOptions.length === 0) {
+  //     // 현재 선택된 레시피의 인덱스를 찾아서 다시 요청
+  //     // 이 경우는 이미 상세 화면이므로, serving_size만 업데이트하여 재요청
+  //     setLoading(true)
+  //     setLoadingStage('인분 수 조정 중...')
+  //     try {
+  //       // 원래 선택했던 레시피 인덱스를 찾기 어려우므로, 
+  //       // 현재 result의 recipe 정보를 기반으로 serving_size만 업데이트
+  //       // recipes가 없으면 전체 검색이 실행되지만, 이미 상세 화면이므로 0번 인덱스 사용
+  //       const response = await selectRecipe(0, getIngredientsString(), newSize)
+  //       if (response.success && response.data) {
+  //         setResult(response.data)
+  //       }
+  //     } catch (err: any) {
+  //       setError(err.message || '인분 수 조정 중 오류가 발생했습니다.')
+  //     } finally {
+  //       setLoading(false)
+  //       setLoadingStage('')
+  //     }
+  //   }
+  // }
 
   // 체크박스에서 재료 선택
   const handleCheckboxToggle = (item: string) => {
@@ -531,8 +531,8 @@ const RecipeRecommendation = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    {/* 인분 수 조정 */}
-                    <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                    {/* 인분 수 조정 - 주석처리 (1인분 고정) */}
+                    {/* <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
                       <span className="text-sm font-medium text-gray-700">인분:</span>
                       <div className="flex items-center gap-1">
                         <button
@@ -553,7 +553,7 @@ const RecipeRecommendation = () => {
                           +
                         </button>
                       </div>
-                    </div>
+                    </div> */}
                     {searchSource && (
                       <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full font-medium">
                         {searchSource}

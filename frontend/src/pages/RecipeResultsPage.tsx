@@ -9,6 +9,7 @@ const RecipeResultsPage = () => {
   
   const [loading, setLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState<string>('')
+  const [loadingProgress, setLoadingProgress] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
 
   const handleSelectRecipe = async (index: number) => {
@@ -33,14 +34,17 @@ const RecipeResultsPage = () => {
     setLoading(true)
     setError(null)
     setLoadingStage('레시피 검색 중...')
+    setLoadingProgress(20) // Phase 1: 다중 소스 수집
 
-    // 단계별 로딩 메시지
+    // 단계별 로딩 메시지 및 진행률
     const stageTimer = setTimeout(() => {
       setLoadingStage('요리 순서 정렬 중...')
+      setLoadingProgress(60) // Phase 3: 조리 순서 최적화
     }, 3000)
 
     const stageTimer2 = setTimeout(() => {
       setLoadingStage('대체재료 생각 중...')
+      setLoadingProgress(80) // Phase 2: 재료 검증 및 대체재료
     }, 6000)
 
     try {
@@ -54,6 +58,7 @@ const RecipeResultsPage = () => {
 
       clearTimeout(stageTimer)
       clearTimeout(stageTimer2)
+      setLoadingProgress(100) // 완료
 
       if (response.success && response.data) {
         // 레시피 상세 페이지로 이동
@@ -66,12 +71,14 @@ const RecipeResultsPage = () => {
       } else {
         setError(response.error || '레시피를 불러올 수 없습니다.')
         setLoadingStage('')
+        setLoadingProgress(0)
       }
     } catch (err: any) {
       clearTimeout(stageTimer)
       clearTimeout(stageTimer2)
       setError(err.message || '오류가 발생했습니다.')
       setLoadingStage('')
+      setLoadingProgress(0)
     } finally {
       setLoading(false)
     }
@@ -132,9 +139,23 @@ const RecipeResultsPage = () => {
 
       {loading && loadingStage && (
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 animate-fade-in border border-gray-100">
-          <div className="flex items-center justify-center gap-3 py-8">
-            <span className="animate-spin text-3xl">⏳</span>
-            <span className="text-xl font-semibold text-gray-700">{loadingStage}</span>
+          <div className="flex flex-col items-center justify-center gap-4 py-6">
+            <div className="flex items-center gap-3">
+              <span className="animate-spin text-3xl">⏳</span>
+              <span className="text-xl font-semibold text-gray-700">{loadingStage}</span>
+            </div>
+            {/* 진행률 게이지 바 */}
+            <div className="w-full max-w-md">
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-orange-500 to-pink-500 h-3 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                ></div>
+              </div>
+              <div className="text-center mt-2 text-sm text-gray-500">
+                {loadingProgress}%
+              </div>
+            </div>
           </div>
         </div>
       )}

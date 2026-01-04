@@ -1,7 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { selectRecipe } from '../services/api'
-import type { RecipeResponse } from '../types/recipe'
 
 const RecipeResultsPage = () => {
   const navigate = useNavigate()

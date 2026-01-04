@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = ""
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://disciplined-youthfulness-production-6532.up.railway.app"
+    ]
     
     # Logging
     LOG_LEVEL: str = "INFO"

@@ -200,15 +200,13 @@ pip install -r requirements.txt
 OPENAI_API_KEY=your_openai_api_key
 TAVILY_API_KEY=your_tavily_api_key
 LOG_LEVEL=INFO
-CORS_ORIGINS=["http://localhost:5173"]
+CORS_ORIGINS=["http://localhost:3000"]
 ```
 
 4. **서버 실행**
 ```bash
 python -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
 ```
-
-서버는 기본적으로 `http://localhost:8000`에서 실행됩니다.
 
 ### Frontend 설정
 
@@ -218,10 +216,29 @@ cd frontend
 npm install
 ```
 
-2. **개발 서버 실행**
+2. **환경 변수 설정** (로컬 환경에서 실행 시)
+로컬 환경에서 백엔드 API를 사용하려면 환경 변수를 설정해야 합니다.
+
+`frontend` 디렉토리에 `.env` 파일을 생성하고 다음 내용을 추가:
+```env
+VITE_API_BASE_URL=http://localhost:5000
+```
+
+또는 `frontend/src/services/api.ts` 파일의 `API_BASE_URL` 기본값을 직접 수정:
+```typescript
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+```
+
+> **참고**: 배포 환경에서는 환경 변수 `VITE_API_BASE_URL`이 자동으로 설정되므로 별도 수정이 필요 없습니다.
+
+3. **개발 서버 실행**
 ```bash
 npm run dev
 ```
+
+프론트엔드는 기본적으로 `http://localhost:3000`에서 실행됩니다.
+
+> **참고**: `vite.config.ts`에 프록시 설정이 되어 있어, 환경 변수를 설정하지 않아도 로컬 개발 시 백엔드 API (`http://localhost:5000`)로 자동 프록시됩니다. 다만 배포 환경에서 사용하려면 환경 변수 설정이 필요합니다.
 
 ## 📖 주요 기능 상세
 
@@ -271,11 +288,10 @@ npm run dev
 20. **calculate_confidence_score**: 신뢰도 점수 계산
 21. **generate_output**: 최종 결과 생성
 22. **collect_user_feedback**: 사용자 피드백 수집
-23. **generate_storage_tips**: 재료 보관 및 활용 팁 생성
 
 ### 매칭 점수 필터링
 
-매칭 점수가 20점 미만인 레시피는 자동으로 필터링됩니다.
+매칭 점수가 30점 미만인 레시피는 자동으로 필터링됩니다.
 
 ## 🎬 동작 예시
 
@@ -396,8 +412,7 @@ npm run dev
     "cooking_steps": [...],
     "shopping_list": [...],
     "substitutions": [...],
-    "substitution_guidances": [...],
-    "storage_tips": [...]
+    "substitution_guidances": [...]
   }
 }
 ```
@@ -424,7 +439,7 @@ npm run dev
 
 3. **필터링 개선**
    - 식기류 자동 필터링 (계량컵, 대접 등)
-   - 매칭 점수 20점 이상만 표시
+   - 매칭 점수 30점 이상만 표시
    - 쇼핑 리스트에서 대체 가능 재료 자동 제외
 
 4. **페르소나 기반 출력**

@@ -50,6 +50,7 @@ class GraphState(TypedDict):
     user_choice: Optional[int]  # 사용자가 선택한 레시피 인덱스
     selected_recipe_id: Optional[str]  # 선택한 레시피 ID (정확한 매칭용)
     selected_recipe_name: Optional[str]  # 선택한 레시피 이름 (정확한 매칭용)
+    pre_selected_recipe: Optional[Dict[str, Any]]  # 선택한 레시피 전체 정보 (재검색 결과에 없을 때 사용)
     
     # 분석 결과
     nutrition_info: Optional[Dict[str, Any]]  # 영양 정보

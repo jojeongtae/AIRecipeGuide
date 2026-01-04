@@ -50,7 +50,7 @@ export const recommendRecipe = async (request: RecipeRequest): Promise<RecipeRes
   return response.data
 }
 
-export const selectRecipe = async (recipeIndex: number, ingredients: string, userPersona?: string, recipeId?: string, recipeName?: string/*, servingSize?: number*/): Promise<RecipeResponse> => {
+export const selectRecipe = async (recipeIndex: number, ingredients: string, userPersona?: string, recipeId?: string, recipeName?: string, recipeData?: any/*, servingSize?: number*/): Promise<RecipeResponse> => {
   const params = new URLSearchParams({
     recipe_index: recipeIndex.toString(),
     ingredients: ingredients
@@ -63,6 +63,9 @@ export const selectRecipe = async (recipeIndex: number, ingredients: string, use
   }
   if (recipeName) {
     params.append('recipe_name', recipeName)
+  }
+  if (recipeData) {
+    params.append('recipe_data', JSON.stringify(recipeData))
   }
   // if (servingSize) {
   //   params.append('serving_size', servingSize.toString())

@@ -55,7 +55,8 @@ const RecipeResultsPage = () => {
         ingredientsString,
         userPersona,
         selectedRecipe.id,  // 레시피 ID 전달 (정확한 매칭용)
-        selectedRecipe.name  // 레시피 이름 전달 (정확한 매칭용)
+        selectedRecipe.name,  // 레시피 이름 전달 (정확한 매칭용)
+        selectedRecipe  // 레시피 전체 정보 전달 (재검색 결과에 없을 때 사용)
         // 2 // servingSize 주석처리 (1인분 고정)
       )
 

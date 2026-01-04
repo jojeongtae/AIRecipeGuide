@@ -164,6 +164,7 @@ async def select_recipe(
     user_persona: Optional[str] = Query(None, description="사용자 페르소나 (beginner/expert)"),
     recipe_id: Optional[str] = Query(None, description="선택한 레시피 ID (정확한 매칭용)"),
     recipe_name: Optional[str] = Query(None, description="선택한 레시피 이름 (정확한 매칭용)"),
+    recipe_data: Optional[str] = Query(None, description="선택한 레시피 전체 정보 (JSON 문자열)"),
 ):
     """
     여러 레시피 중 하나 선택
@@ -191,6 +192,15 @@ async def select_recipe(
             initial_state["selected_recipe_id"] = recipe_id
         if recipe_name:
             initial_state["selected_recipe_name"] = recipe_name
+        # 선택한 레시피 전체 정보 저장 (재검색 결과에 없을 때 사용)
+        if recipe_data:
+            try:
+                import json
+                selected_recipe_data = json.loads(recipe_data)
+                initial_state["pre_selected_recipe"] = selected_recipe_data
+                logger.info(f"선택한 레시피 정보 저장: {selected_recipe_data.get('name', 'Unknown')}")
+            except Exception as e:
+                logger.warning(f"레시피 데이터 파싱 실패: {e}")
         
         result = recipe_graph.invoke(initial_state)
         

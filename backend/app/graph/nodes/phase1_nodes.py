@@ -949,6 +949,7 @@ def select_recipe(state: GraphState) -> Dict[str, Any]:
     if user_choice is not None:
         selected_recipe_id = state.get("selected_recipe_id")
         selected_recipe_name = state.get("selected_recipe_name")
+        pre_selected_recipe = state.get("pre_selected_recipe")  # 미리 저장된 레시피 정보
         
         # 레시피 ID 또는 이름으로 먼저 찾기 (정확한 매칭)
         selected = None
@@ -975,8 +976,18 @@ def select_recipe(state: GraphState) -> Dict[str, Any]:
                 logger.info(f"사용자 선택 레시피 (인덱스 {user_choice}): {selected.get('name', 'Unknown')}")
             else:
                 logger.warning(f"유효하지 않은 레시피 인덱스: {user_choice} (총 {len(recipes)}개 레시피)")
-                # 인덱스가 범위를 벗어나면 첫 번째 레시피 선택
-                selected = recipes[0] if recipes else None
+                # 인덱스가 범위를 벗어났지만 미리 저장된 레시피가 있으면 사용
+                if pre_selected_recipe:
+                    selected = pre_selected_recipe
+                    logger.info(f"인덱스 범위 초과, 미리 저장된 레시피 사용: {selected.get('name', 'Unknown')}")
+                else:
+                    # 마지막 수단: 첫 번째 레시피 선택
+                    selected = recipes[0] if recipes else None
+        
+        # 최종적으로 선택된 레시피가 없고 미리 저장된 레시피가 있으면 사용
+        if not selected and pre_selected_recipe:
+            selected = pre_selected_recipe
+            logger.info(f"재검색 결과에 없어서 미리 저장된 레시피 사용: {selected.get('name', 'Unknown')}")
         
         if selected:
             return {"selected_recipe": selected}

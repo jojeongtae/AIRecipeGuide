@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { Recipe, NutritionInfo, CookingStep, ShoppingListItem, SubstitutionSuggestion } from '../types/recipe'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://airecipeguide-production.up.railway.app'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

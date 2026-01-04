@@ -53,7 +53,9 @@ const RecipeResultsPage = () => {
       const response = await selectRecipe(
         index,
         ingredientsString,
-        userPersona
+        userPersona,
+        selectedRecipe.id,  // 레시피 ID 전달 (정확한 매칭용)
+        selectedRecipe.name  // 레시피 이름 전달 (정확한 매칭용)
         // 2 // servingSize 주석처리 (1인분 고정)
       )
 

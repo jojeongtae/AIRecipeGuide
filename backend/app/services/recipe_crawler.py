@@ -94,9 +94,46 @@ def search_recipes_by_ingredients(ingredients: List[str], max_results: int = 10,
         raise RecipeCrawlerError(f"크롤링 오류: {e}") from e
 
 
+def _calculate_name_similarity(menu_name: str, recipe_name: str) -> float:
+    """
+    메뉴 이름과 레시피 이름의 유사도 계산 (0.0 ~ 1.0)
+    """
+    menu_name_lower = menu_name.lower().strip()
+    recipe_name_lower = recipe_name.lower().strip()
+    
+    # 완전 일치
+    if menu_name_lower == recipe_name_lower:
+        return 1.0
+    
+    # 포함 관계 확인
+    if menu_name_lower in recipe_name_lower:
+        # 메뉴 이름이 레시피 이름에 포함되는 경우
+        ratio = len(menu_name_lower) / len(recipe_name_lower)
+        return 0.8 + (ratio * 0.2)  # 0.8 ~ 1.0
+    
+    if recipe_name_lower in menu_name_lower:
+        # 레시피 이름이 메뉴 이름에 포함되는 경우 (부분 일치)
+        ratio = len(recipe_name_lower) / len(menu_name_lower)
+        return 0.6 + (ratio * 0.2)  # 0.6 ~ 0.8
+    
+    # 단어 단위 매칭
+    menu_words = set(menu_name_lower.split())
+    recipe_words = set(recipe_name_lower.split())
+    
+    if menu_words and recipe_words:
+        common_words = menu_words & recipe_words
+        if common_words:
+            # 공통 단어 비율
+            similarity = len(common_words) / max(len(menu_words), len(recipe_words))
+            return min(0.5, similarity)  # 최대 0.5
+    
+    # 유사도 없음
+    return 0.0
+
+
 def search_recipes_by_name(menu_name: str, max_results: int = 5, user_ingredients: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
-    메뉴 이름으로 레시피 검색
+    메뉴 이름으로 레시피 검색 (이름 일치도 우선 정렬)
     
     Args:
         menu_name: 검색할 메뉴 이름 (예: "파스타", "김치찌개")
@@ -104,10 +141,22 @@ def search_recipes_by_name(menu_name: str, max_results: int = 5, user_ingredient
         user_ingredients: 사용자가 보유한 전체 재료 목록 (매칭 계산용)
     
     Returns:
-        레시피 정보 리스트
+        레시피 정보 리스트 (이름 일치도 높은 순으로 정렬)
     """
     # 기존 함수 재사용 (메뉴 이름을 검색어로 사용)
-    return search_recipes_by_ingredients([menu_name], max_results=max_results, user_ingredients=user_ingredients)
+    recipes = search_recipes_by_ingredients([menu_name], max_results=max_results * 2, user_ingredients=user_ingredients)
+    
+    # 각 레시피에 이름 일치도 점수 추가
+    for recipe in recipes:
+        recipe_name = recipe.get("name", "")
+        name_similarity = _calculate_name_similarity(menu_name, recipe_name)
+        recipe["name_similarity"] = name_similarity
+    
+    # 이름 일치도가 높은 순으로 정렬 (내림차순)
+    recipes.sort(key=lambda x: x.get("name_similarity", 0.0), reverse=True)
+    
+    # 상위 max_results개만 반환
+    return recipes[:max_results]
 
 
 def _parse_recipe_item(item, user_ingredients: List[str]) -> Optional[Dict[str, Any]]:

@@ -162,6 +162,8 @@ async def select_recipe(
     ingredients: str = Query(..., description="재료 목록 (쉼표로 구분)"),
     serving_size: Optional[int] = Query(None, description="인분 수"),
     user_persona: Optional[str] = Query(None, description="사용자 페르소나 (beginner/expert)"),
+    recipe_id: Optional[str] = Query(None, description="선택한 레시피 ID (정확한 매칭용)"),
+    recipe_name: Optional[str] = Query(None, description="선택한 레시피 이름 (정확한 매칭용)"),
 ):
     """
     여러 레시피 중 하나 선택
@@ -184,6 +186,11 @@ async def select_recipe(
             user_persona=user_persona_enum
         )
         initial_state["user_choice"] = recipe_index
+        # 선택한 레시피를 정확히 식별하기 위한 정보 추가
+        if recipe_id:
+            initial_state["selected_recipe_id"] = recipe_id
+        if recipe_name:
+            initial_state["selected_recipe_name"] = recipe_name
         
         result = recipe_graph.invoke(initial_state)
         
@@ -270,6 +277,9 @@ async def get_recipe_by_menu(
             
             return recipe_copy
         
+        # 이름 일치도 점수 추가 (이미 search_recipes_by_name에서 계산됨)
+        # 추가로 매칭률 기반 정렬도 고려
+        
         # 병렬 처리로 매칭률 계산 (성능 최적화)
         recipes_with_match_rate = []
         with ThreadPoolExecutor(max_workers=3) as executor:
@@ -285,34 +295,16 @@ async def get_recipe_by_menu(
                 except Exception as e:
                     logger.error(f"매칭률 계산 오류: {e}")
                     continue
-            recipe_copy = recipe.copy()
-            
-            # serving_size 필드 제거 (항상 1인분 기준, 표시하지 않음)
-            if "serving_size" in recipe_copy:
-                del recipe_copy["serving_size"]
-            
-            # 재료 비교하여 매칭률 계산
-            ingredient_check_result = check_ingredients_simple(
-                required_ingredients=recipe_copy.get("ingredients", []),
-                user_ingredients=user_ingredients_list,
-                recipe_name=recipe_copy.get("name", "")
-            )
-            
-            # 매칭률 정보 추가
-            recipe_copy["match_rate"] = ingredient_check_result["match_rate"]
-            recipe_copy["matched_ingredients"] = ingredient_check_result["matched_ingredients"]
-            recipe_copy["missing_ingredients"] = ingredient_check_result["missing_ingredients"]
-            
-            recipes_with_match_rate.append(recipe_copy)
         
-        # 정렬: 레시피 이름에 메뉴 이름이 포함된 것을 우선, 그 다음 매칭률 순
-        def sort_key(recipe):
-            name = recipe.get("name", "").lower()
-            menu_lower = menu_name.lower()
-            name_match = 1 if menu_lower in name else 0  # 이름에 메뉴명 포함되면 1, 아니면 0
-            match_rate = recipe.get("match_rate", 0.0)
-            return (name_match, match_rate)  # 튜플 정렬: 첫 번째 요소 우선, 같으면 두 번째 요소
-        recipes_with_match_rate.sort(key=sort_key, reverse=True)
+        # 최종 정렬: 이름 일치도 우선 (이미 search_recipes_by_name에서 계산됨), 그 다음 매칭률
+        # name_similarity가 이미 계산되어 있으므로 이를 우선 사용
+        recipes_with_match_rate.sort(
+            key=lambda x: (
+                x.get("name_similarity", 0.0),  # 이름 일치도 (내림차순)
+                x.get("match_rate", 0.0)  # 재료 매칭률 (내림차순)
+            ),
+            reverse=True
+        )
         
         # 응답 데이터 구성 (레시피 목록 반환)
         result_data = {

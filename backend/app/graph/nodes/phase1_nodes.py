@@ -947,15 +947,42 @@ def select_recipe(state: GraphState) -> Dict[str, Any]:
         return {"selected_recipe": recipes[0]}
     
     if user_choice is not None:
-        # user_choice가 유효한 범위인지 확인
-        if 0 <= user_choice < len(recipes):
-            selected = recipes[user_choice]
-            logger.info(f"사용자 선택 레시피 (인덱스 {user_choice}): {selected.get('name', 'Unknown')}")
+        selected_recipe_id = state.get("selected_recipe_id")
+        selected_recipe_name = state.get("selected_recipe_name")
+        
+        # 레시피 ID 또는 이름으로 먼저 찾기 (정확한 매칭)
+        selected = None
+        if selected_recipe_id or selected_recipe_name:
+            for recipe in recipes:
+                recipe_id = recipe.get("id", "")
+                recipe_name = recipe.get("name", "")
+                
+                # ID 매칭 우선
+                if selected_recipe_id and recipe_id == selected_recipe_id:
+                    selected = recipe
+                    logger.info(f"레시피 ID로 매칭: {recipe_name} (ID: {recipe_id})")
+                    break
+                # 이름 매칭
+                elif selected_recipe_name and recipe_name == selected_recipe_name:
+                    selected = recipe
+                    logger.info(f"레시피 이름으로 매칭: {recipe_name}")
+                    break
+        
+        # ID/이름 매칭 실패 시 인덱스로 선택
+        if not selected:
+            if 0 <= user_choice < len(recipes):
+                selected = recipes[user_choice]
+                logger.info(f"사용자 선택 레시피 (인덱스 {user_choice}): {selected.get('name', 'Unknown')}")
+            else:
+                logger.warning(f"유효하지 않은 레시피 인덱스: {user_choice} (총 {len(recipes)}개 레시피)")
+                # 인덱스가 범위를 벗어나면 첫 번째 레시피 선택
+                selected = recipes[0] if recipes else None
+        
+        if selected:
             return {"selected_recipe": selected}
         else:
-            logger.warning(f"유효하지 않은 레시피 인덱스: {user_choice} (총 {len(recipes)}개 레시피)")
-            # 인덱스가 범위를 벗어나면 첫 번째 레시피 선택
-            return {"selected_recipe": recipes[0]}
+            logger.error("선택할 레시피를 찾을 수 없습니다.")
+            return {"error": "선택할 레시피를 찾을 수 없습니다."}
     
     # 여러 개인 경우 상위 10개 반환 (사용자 선택 대기)
     logger.info(f"레시피 {len(recipes)}개 중 상위 10개 반환")

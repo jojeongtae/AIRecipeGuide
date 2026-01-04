@@ -48,6 +48,8 @@ class GraphState(TypedDict):
     search_source: Optional[str]  # 검색 소스 (tavily, crawler, llm)
     selected_recipe: Optional[Dict[str, Any]]  # 선택된 레시피
     user_choice: Optional[int]  # 사용자가 선택한 레시피 인덱스
+    selected_recipe_id: Optional[str]  # 선택한 레시피 ID (정확한 매칭용)
+    selected_recipe_name: Optional[str]  # 선택한 레시피 이름 (정확한 매칭용)
     
     # 분석 결과
     nutrition_info: Optional[Dict[str, Any]]  # 영양 정보

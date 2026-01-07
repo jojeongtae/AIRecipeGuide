@@ -51,6 +51,11 @@ def search_recipes_by_ingredients(ingredients: List[str], max_results: int = 10,
     # 재료를 검색어로 변환
     search_query = " ".join(ingredients)
     
+    # 단일 재료만 검색하는 경우 "요리" 키워드 추가하여 더 정확한 결과 얻기
+    # (예: "소금" -> "소금 요리"로 검색하여 보관법 같은 비레시피 항목 제외)
+    if len(ingredients) == 1:
+        search_query = f"{search_query} 요리"
+    
     try:
         # 만개의레시피 검색 URL
         search_url = f"https://www.10000recipe.com/recipe/list.html?q={quote_plus(search_query)}"
@@ -64,8 +69,8 @@ def search_recipes_by_ingredients(ingredients: List[str], max_results: int = 10,
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # 레시피 목록 추출
-            recipe_items = soup.find_all('div', class_='common_sp_thumb')[:max_results]
+            # 레시피 목록 추출 (더 많이 가져와서 필터링)
+            recipe_items = soup.find_all('div', class_='common_sp_thumb')[:max_results * 2]
             
             # 병렬 처리로 레시피 상세 정보 가져오기
             recipes = []
@@ -82,11 +87,15 @@ def search_recipes_by_ingredients(ingredients: List[str], max_results: int = 10,
                         recipe = future.result()
                         if recipe:
                             recipes.append(recipe)
+                            # 충분한 레시피를 찾으면 중단
+                            if len(recipes) >= max_results:
+                                break
                     except Exception as e:
                         # 개별 레시피 파싱 실패해도 계속 진행
                         continue
             
-            return recipes
+            # 최종적으로 max_results 개수만 반환
+            return recipes[:max_results]
             
     except httpx.HTTPError as e:
         raise RecipeCrawlerError(f"레시피 검색 실패: {e}") from e
@@ -238,6 +247,18 @@ def _parse_recipe_item(item, user_ingredients: List[str]) -> Optional[Dict[str, 
         if recipe_detail.get("name") and recipe_detail["name"] != "레시피":
             recipe_name = recipe_detail["name"]
         
+        # 조리 방법이 없는 레시피는 제외 (레시피가 아닌 항목 필터링)
+        steps = recipe_detail.get("steps", [])
+        if not steps or len(steps) == 0:
+            return None
+        
+        # 레시피 이름에 보관/보관법 관련 키워드가 있으면 제외
+        recipe_name_lower = recipe_name.lower()
+        non_recipe_keywords = ['보관', '보관법', '보관하기', '보관하는', '보관할', '보관용',
+                              '말리', '말리는', '말리기', '말리는법', '말리는 방법']
+        if any(keyword in recipe_name_lower for keyword in non_recipe_keywords):
+            return None
+        
         # 재료 매칭 점수 계산
         recipe_ingredients = recipe_detail.get("ingredients", [])
         matched_ingredients, missing_ingredients = _calculate_ingredient_match(
@@ -260,7 +281,7 @@ def _parse_recipe_item(item, user_ingredients: List[str]) -> Optional[Dict[str, 
             "cooking_time": recipe_detail.get("cooking_time", 0),
             "difficulty": recipe_detail.get("difficulty", "보통"),
             "level": recipe_detail.get("difficulty", "보통"),
-            "steps": recipe_detail.get("steps", []),
+            "steps": steps,
             "image": final_image,
             "serving_size": recipe_detail.get("serving_size", 2),  # 기본값 2인분
         }

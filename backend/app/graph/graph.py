@@ -80,23 +80,10 @@ def should_search_substitutions(state: GraphState) -> str:
 
 
 def should_retry_modification(state: GraphState) -> str:
-    """레시피 수정 재시도 여부 결정 (최대 3회, 매칭률 개선 체크)"""
+    """레시피 수정 재시도 여부 결정 (최대 3회)"""
     correction_iteration = state.get("correction_iteration", 0)
-    match_rate = state.get("match_rate", 0.0) or 0.0
-    previous_match_rate = state.get("previous_match_rate", 0.0)
     
-    # None 체크 및 기본값 처리
-    if previous_match_rate is None:
-        previous_match_rate = 0.0
-    if match_rate is None:
-        match_rate = 0.0
-    
-    # 최대 재시도 횟수 초과
     if correction_iteration >= 3:
-        return "generate_shopping_list"
-    
-    # 매칭률이 개선되지 않았으면 재시도 중단 (무한 루프 방지)
-    if correction_iteration > 0 and match_rate <= previous_match_rate:
         return "generate_shopping_list"
     
     return "check_ingredients"
@@ -113,29 +100,15 @@ def should_retry_validation(state: GraphState) -> str:
 
 
 def should_retry_nutrition(state: GraphState) -> str:
-    """영양 정보 검증 실패 시 재분석 여부 결정 (최대 2회 재시도)"""
-    validation_passed = state.get("nutrition_validation_passed", True)
-    validation_iteration = state.get("nutrition_validation_iteration", 0)
-    
-    # 검증 통과 또는 최대 재시도 횟수 초과 시 다음 단계로
-    if validation_passed or validation_iteration >= 2:
-        return "optimize_cooking_order"
-    
-    # 검증 실패 시 재분석
-    return "analyze_nutrition"
+    """영양 정보 검증 실패 시 재분석 여부 결정 - 검증 완화"""
+    # 검증 실패해도 그냥 진행 (속도 우선)
+    return "optimize_cooking_order"
 
 
 def should_retry_cooking_order(state: GraphState) -> str:
-    """조리 순서 검증 실패 시 재최적화 여부 결정 (최대 2회 재시도)"""
-    validation_passed = state.get("cooking_order_validation_passed", True)
-    validation_iteration = state.get("cooking_order_validation_iteration", 0)
-    
-    # 검증 통과 또는 최대 재시도 횟수 초과 시 다음 단계로
-    if validation_passed or validation_iteration >= 2:
-        return "validate_recipe_completeness"
-    
-    # 검증 실패 시 재최적화
-    return "optimize_cooking_order"
+    """조리 순서 검증 실패 시 재최적화 여부 결정 - 검증 완화"""
+    # 검증 실패해도 그냥 진행 (속도 우선)
+    return "validate_recipe_completeness"
 
 
 

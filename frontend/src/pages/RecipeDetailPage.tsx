@@ -1,11 +1,12 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import type { Recipe, CookingStep, ShoppingListItem, SubstitutionSuggestion } from '../types/recipe'
 // import { selectRecipe } from '../services/api' // 주석처리 (1인분 고정)
 
 const RecipeDetailPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { recipeData, searchSource } = (location.state as any) || {}
+  const { recipeData, searchSource } = (location.state as { recipeData?: RecipeResponse; searchSource?: string }) || {}
   
   // const [servingSize, setServingSize] = useState<number>(2)
   const [loading] = useState(false)
@@ -257,21 +258,24 @@ const RecipeDetailPage = () => {
         </div>
 
         {/* 요리 순서 */}
-        {fullData?.cooking_steps && (
+        {(fullData?.cooking_steps || recipe?.steps) && (
           <div className="mb-6 sm:mb-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 sm:p-6 border-2 border-yellow-100">
             <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               <span className="text-2xl">👨‍🍳</span>
               요리 순서
             </h3>
             <ol className="space-y-3">
-              {fullData.cooking_steps.map((step: any, idx: number) => (
-                <li key={idx} className="flex gap-3 bg-white px-4 py-3 rounded-lg shadow-sm">
-                  <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full flex items-center justify-center font-bold">
-                    {idx + 1}
-                  </span>
-                  <span className="text-gray-700 pt-0.5">{step.description || step}</span>
-                </li>
-              ))}
+              {(fullData?.cooking_steps || recipe?.steps || []).map((step: CookingStep | string, idx: number) => {
+                const stepDescription = typeof step === 'string' ? step : step.description || step.step?.toString() || ''
+                return (
+                  <li key={idx} className="flex gap-3 bg-white px-4 py-3 rounded-lg shadow-sm">
+                    <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full flex items-center justify-center font-bold">
+                      {idx + 1}
+                    </span>
+                    <span className="text-gray-700 pt-0.5">{stepDescription}</span>
+                  </li>
+                )
+              })}
             </ol>
           </div>
         )}
@@ -293,7 +297,7 @@ const RecipeDetailPage = () => {
                     </div>
                   </div>
                   <ul className="space-y-3">
-                    {item.suggestions.map((suggestion: any, sIdx: number) => (
+                    {item.suggestions.map((suggestion, sIdx: number) => (
                       <li key={`${suggestion.ingredient}-${sIdx}`} className="border border-green-100 rounded-lg p-3 bg-green-50/50">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-semibold text-gray-800">{suggestion.ingredient}</span>
@@ -328,7 +332,7 @@ const RecipeDetailPage = () => {
               쇼핑 리스트
             </h3>
             <ul className="space-y-2">
-              {fullData.shopping_list.map((item: any, idx: number) => (
+              {fullData.shopping_list?.map((item: ShoppingListItem, idx: number) => (
                 <li key={idx} className="bg-white px-4 py-2 rounded-lg shadow-sm text-yellow-800">
                   <span className="font-semibold">{item.display || item.ingredient}</span>
                   {item.quantity && (

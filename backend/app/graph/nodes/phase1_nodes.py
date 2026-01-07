@@ -13,6 +13,12 @@ from typing import Dict, Any, List, Optional, Tuple
 from app.models.state import GraphState, UserPersona
 from app.config import settings
 from app.utils.ingredient_map import IngredientNormalizer, check_ingredient_substitution_with_llm
+from app.database import SessionLocal
+from app.services.db_service import (
+    get_cached_search,
+    save_search_cache,
+    save_recipe
+)
 from app.constants import (
     SUBSTITUTION_RULES,
     CATEGORY_SUBSTITUTIONS,
@@ -29,6 +35,9 @@ from app.constants import (
     DEFAULT_DIFFICULTY
 )
 from app.graph.utils.llm_helpers import call_openai_api, extract_json_from_response
+from app.graph.nodes.search_module import _generate_recipes_with_llm, _search_recipes_with_tavily, _parse_tavily_results_with_llm
+from app.graph.nodes.filter_module import filter_recipes, _has_main_ingredient_in_recipe
+from app.graph.nodes.selection_module import select_recipe, compare_and_select_source
 from app.graph.utils.ingredient_utils import (
     normalize_ingredient_name,
     parse_ingredient_quantity,
@@ -152,80 +161,7 @@ def _get_recipe_image_url(recipe_name: str) -> str:
 
 
 
-def _generate_recipes_with_llm(ingredients: List[str]) -> List[Dict[str, Any]]:
-    """LLM을 사용하여 재료 기반 레시피 생성"""
-    if not settings.OPENAI_API_KEY:
-        # API 키가 없으면 기본 레시피 반환
-        return _get_default_recipes(ingredients)
-    
-    try:
-        ingredients_str = ", ".join(ingredients)
-        prompt = f"""다음 재료를 사용하여 만들 수 있는 한국 요리 레시피 3개를 추천해주세요.
-
-보유한 재료: {ingredients_str}
-
-각 레시피에 대해 다음 정보를 JSON 형식으로 제공해주세요:
-1. 레시피 이름 (name)
-2. 필요한 재료 목록 (ingredients) - 보유한 재료와 추가로 필요한 재료 포함
-3. 조리 시간 (cooking_time) - 분 단위
-4. 난이도 (difficulty) - "초보환영", "보통", "어려움" 중 하나
-5. 요리 순서 (steps) - 단계별 설명
-
-응답은 반드시 다음 JSON 형식으로 해주세요:
-{{
-  "recipes": [
-    {{
-      "name": "레시피 이름",
-      "ingredients": ["재료1", "재료2", ...],
-      "cooking_time": 30,
-      "difficulty": "보통",
-      "steps": ["1단계 설명", "2단계 설명", ...]
-    }}
-  ]
-}}
-
-JSON만 응답하고 다른 설명은 하지 마세요."""
-
-        # OpenAI API 호출 (헤더 최소화로 헤더 불일치 문제 해결)
-        messages = [
-            {"role": "system", "content": "당신은 한국 요리 전문가입니다. 주어진 재료로 만들 수 있는 맛있는 레시피를 추천해주세요."},
-            {"role": "user", "content": prompt}
-        ]
-        content = _call_openai_api(messages=messages, model="gpt-4o-mini", temperature=0.7)
-        content = _extract_json_from_response(content)
-        result = json.loads(content)
-        recipes = result.get("recipes", [])
-        
-        # 레시피 형식 변환
-        formatted_recipes = []
-        for i, recipe in enumerate(recipes, 1):
-            recipe_name = recipe.get("name", "레시피")
-            # 레시피 이름으로 이미지 URL 생성
-            recipe_image = _get_recipe_image_url(recipe_name)
-            
-            formatted_recipe = {
-                "id": f"llm_{i}",
-                "name": recipe_name,
-                "ingredients": recipe.get("ingredients", []),
-                "cooking_time": recipe.get("cooking_time", 30),
-                "difficulty": recipe.get("difficulty", "보통"),
-                "level": recipe.get("difficulty", "보통"),
-                "steps": recipe.get("steps", []),
-                "match_score": 0.0,  # 나중에 계산
-                "image": recipe_image,  # 이미지 추가
-                "serving_size": 2,  # 기본값 2인분
-            }
-            formatted_recipes.append(formatted_recipe)
-        
-        return formatted_recipes
-        
-    except ImportError:
-        return _get_default_recipes(ingredients)
-    except Exception as e:
-        logger.error(f"LLM 레시피 생성 오류: {e}")
-        return _get_default_recipes(ingredients)
-
-
+# _generate_recipes_with_llm는 search_module.py에서 import됨
 
 def _get_default_recipes(ingredients: List[str]) -> List[Dict[str, Any]]:
     """기본 레시피 반환 (LLM 사용 불가 시)"""
@@ -444,128 +380,7 @@ def _search_recipes_with_tavily(ingredients: List[str]) -> List[Dict[str, Any]]:
 
 
 
-def _parse_tavily_results_with_llm(search_results: List[Dict], ingredients: List[str]) -> List[Dict[str, Any]]:
-    """LLM을 사용하여 Tavily 검색 결과를 레시피 형식으로 파싱"""
-    if not settings.OPENAI_API_KEY:
-        return []
-    
-    try:
-        # 검색 결과 요약 및 이미지 추출
-        results_summary = []
-        result_images = []  # 각 결과의 이미지 URL 저장
-        
-        for i, result in enumerate(search_results[:5], 1):  # 상위 5개만 사용
-            title = result.get("title", "")
-            content = result.get("content", "")[:500]  # 처음 500자만
-            url = result.get("url", "")
-            
-            # 이미지 URL 추출 (여러 소스 시도)
-            image_url = ""
-            if "images" in result and result["images"]:
-                image_url = result["images"][0]  # 첫 번째 이미지 사용
-            elif "image" in result:
-                image_url = result["image"]
-            
-            result_images.append(image_url)
-            results_summary.append(f"{i}. {title}\n{content}\nURL: {url}")
-        
-        results_text = "\n\n".join(results_summary)
-        ingredients_str = ", ".join(ingredients)
-        
-        prompt = f"""다음은 웹 검색 결과입니다. 이 결과에서 사용자가 보유한 재료({ingredients_str})로 만들 수 있는 한국 요리 레시피를 추출해주세요.
-
-검색 결과:
-{results_text}
-
-**중요**: 각 레시피에 대해 반드시 다음 정보를 모두 포함하여 JSON 형식으로 제공해주세요:
-1. 레시피 이름 (name)
-2. 필요한 재료 목록 (ingredients) - 보유한 재료와 추가로 필요한 재료 포함
-3. 조리 시간 (cooking_time) - 분 단위
-4. 난이도 (difficulty) - "초보환영", "보통", "어려움" 중 하나
-5. 요리 순서 (steps) - **반드시 5-8단계의 상세한 조리 과정을 배열로 제공**
-
-요리 순서(steps)는 다음 형식으로 작성해주세요:
-- 각 단계는 구체적이고 실용적으로 작성
-- 재료 준비 → 양념/소스 준비 → 조리 시작 → 중간 과정 → 마무리 순서로 구성
-- 최소 5단계 이상 필수
-
-응답은 반드시 다음 JSON 형식으로 해주세요:
-{{
-  "recipes": [
-    {{
-      "name": "레시피 이름",
-      "ingredients": ["재료1", "재료2", ...],
-      "cooking_time": 30,
-      "difficulty": "보통",
-      "steps": ["1단계: 재료를 준비하고 손질합니다", "2단계: 양념을 만듭니다", "3단계: 팬에 기름을 두르고 볶습니다", "4단계: 중간 과정", "5단계: 완성합니다"]
-    }}
-  ]
-}}
-
-**steps 필드는 반드시 5개 이상의 단계를 포함해야 합니다. 빈 배열이나 단계가 적은 경우는 절대 안 됩니다.**
-
-JSON만 응답하고 다른 설명은 하지 마세요."""
-
-        # OpenAI API 호출 (헤더 최소화로 헤더 불일치 문제 해결)
-        messages = [
-            {"role": "system", "content": "당신은 한국 요리 전문가입니다. 웹 검색 결과에서 주어진 재료로 만들 수 있는 맛있는 레시피를 추출해주세요."},
-            {"role": "user", "content": prompt}
-        ]
-        content = _call_openai_api(messages=messages, model="gpt-4o-mini", temperature=0.7)
-        
-        # JSON 추출
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
-        
-        result = json.loads(content)
-        recipes = result.get("recipes", [])
-        
-        # 레시피 형식 변환
-        formatted_recipes = []
-        for i, recipe in enumerate(recipes, 1):
-            steps = recipe.get("steps", [])
-            recipe_name = recipe.get("name", "레시피")
-            
-            # steps가 없거나 비어있으면 레시피 이름과 재료로부터 생성
-            if not steps or len(steps) == 0:
-                logger.warning(f"Tavily 레시피 '{recipe_name}'에 steps가 없습니다. LLM으로 생성합니다.")
-                steps = _generate_cooking_steps_with_llm(
-                    recipe_name,
-                    recipe.get("ingredients", []),
-                    recipe.get("cooking_time", 30)
-                )
-                if not steps:
-                    # LLM 생성 실패 시 기본 단계
-                    steps = [
-                        "재료를 준비하고 손질합니다.",
-                        "양념이나 소스를 만듭니다.",
-                        "팬이나 냄비에 기름을 두르고 가열합니다.",
-                        "재료를 넣고 조리합니다.",
-                        "완성합니다."
-                    ]
-            
-            formatted_recipe = {
-                "id": str(i),
-                "name": recipe_name,
-                "ingredients": recipe.get("ingredients", []),
-                "cooking_time": recipe.get("cooking_time", 30),
-                "difficulty": recipe.get("difficulty", "보통"),
-                "level": recipe.get("difficulty", "보통"),
-                "steps": steps,
-                "match_score": 0.0,  # 나중에 계산
-            }
-            formatted_recipes.append(formatted_recipe)
-        
-        logger.info(f"Tavily 레시피 {len(formatted_recipes)}개 파싱 완료 (모두 steps 포함)")
-        return formatted_recipes
-        
-    except Exception as e:
-        logger.error(f"LLM 레시피 파싱 오류: {e}")
-        return []
-
-
+# _parse_tavily_results_with_llm는 search_module.py에서 import됨
 
 def search_recipes(state: GraphState) -> Dict[str, Any]:
     """
@@ -573,18 +388,47 @@ def search_recipes(state: GraphState) -> Dict[str, Any]:
     크롤링, Tavily, LLM 결과를 각각 수집하여 compare_and_select_source로 전달
     """
     ingredients = state.get("ingredients", [])
+    filters = state.get("filters", {})
+    pre_selected_recipe = state.get("pre_selected_recipe")
+    
+    # 캐시 조회 시도 (DB 연결 실패 시 기존 로직으로 폴백)
+    try:
+        db = SessionLocal()
+        cached_result = get_cached_search(db, ingredients, filters)
+        db.close()
+        
+        if cached_result and cached_result.get("cached"):
+            logger.info("캐시에서 검색 결과 조회 성공")
+            # 캐시된 recipe_ids를 사용하여 레시피 정보를 가져와야 하지만,
+            # 현재는 캐시에 recipe_ids만 저장되어 있으므로 compare_and_select_source에서 처리
+            # 여기서는 캐시 히트를 표시만 하고 기존 로직 계속 진행
+            # (실제로는 recipe_ids를 가져와서 레시피를 조회해야 하지만, 
+            #  현재 구조상 compare_and_select_source에서 처리하는 것이 더 적합)
+            state["cache_hit"] = True
+            state["cached_recipe_ids"] = cached_result.get("recipe_ids", [])
+            state["cached_match_scores"] = cached_result.get("match_scores", {})
+    except Exception as e:
+        logger.warning(f"캐시 조회 실패, 기존 로직으로 진행: {e}")
+        state["cache_hit"] = False
     
     crawler_recipes = []
     tavily_recipes = []
     llm_recipes = []
     
     # 1순위: 만개의레시피 크롤링 시도
-    # 육류(닭고기, 소고기, 돼지고기)를 우선적으로 필터링하여 검색
+    # 육류(닭고기, 소고기, 돼지고기, 베이컨 등)를 우선적으로 필터링하여 검색
     meat_keywords = ["닭고기", "닭", "치킨", "닭가슴살", "닭다리", "닭날개", "닭봉",
                      "소고기", "소", "한우", "쇠고기", "등심", "안심", "갈비살", "불고기",
-                     "돼지고기", "돼지", "삼겹살", "목살", "앞다리", "뒷다리", "갈비", "갈비살"]
+                     "돼지고기", "돼지", "삼겹살", "목살", "앞다리", "뒷다리", "갈비", "갈비살",
+                     "오리고기", "오리",
+                     "베이컨", "햄", "소시지", "스팸"]
+    
+    # 해산물 키워드 (육류 다음 우선순위)
+    seafood_keywords = ["고등어", "연어", "참치", "삼치", "꽁치", "멸치", "오징어", "문어", "새우", "게", "조개",
+                        "전복", "소라", "바지락", "홍합", "굴"]
     
     meat_ingredients = []
+    seafood_ingredients = []
     other_main_ingredients = []
     
     for ing in ingredients:
@@ -599,28 +443,55 @@ def search_recipes(state: GraphState) -> Dict[str, Any]:
                 is_meat = True
                 break
         
-        # 육류가 아닌 메인 재료
-        if not is_meat and category == "main":
+        # 해산물 필터링 (육류 다음 우선순위)
+        is_seafood = False
+        if not is_meat:
+            for seafood_keyword in seafood_keywords:
+                if seafood_keyword in normalized or normalized in seafood_keyword:
+                    seafood_ingredients.append(ing)
+                    is_seafood = True
+                    break
+        
+        # 육류/해산물이 아닌 메인 재료
+        if not is_meat and not is_seafood and category == "main":
             other_main_ingredients.append(ing)
     
-    # 육류가 있으면 육류만 검색, 없으면 다른 메인 재료 검색, 그것도 없으면 전체 재료 검색
+    # 검색 전략: 여러 재료를 조합해서 검색하여 더 다양한 결과 얻기
     if meat_ingredients:
-        search_ingredients = meat_ingredients
-        logger.info(f"육류 우선 필터링: {len(meat_ingredients)}개 육류 재료로 검색")
+        # 육류가 있으면 육류 + 해산물/다른 메인 재료 조합 (최대 3개까지)
+        combined_others = seafood_ingredients + other_main_ingredients
+        if combined_others:
+            # 육류 1개 + 해산물/다른 메인 재료 2개까지 조합
+            search_ingredients = meat_ingredients[:1] + combined_others[:2]
+            logger.info(f"육류 + 메인 재료 조합 검색: {len(search_ingredients)}개 재료 ({meat_ingredients[:1]} + {combined_others[:2]})")
+        else:
+            search_ingredients = meat_ingredients
+            logger.info(f"육류 우선 필터링: {len(meat_ingredients)}개 육류 재료로 검색")
+    elif seafood_ingredients:
+        # 해산물이 있으면 해산물 + 다른 메인 재료 조합 (최대 3개까지)
+        if other_main_ingredients:
+            search_ingredients = seafood_ingredients[:1] + other_main_ingredients[:2]
+            logger.info(f"해산물 + 메인 재료 조합 검색: {len(search_ingredients)}개 재료 ({seafood_ingredients[:1]} + {other_main_ingredients[:2]})")
+        else:
+            search_ingredients = seafood_ingredients
+            logger.info(f"해산물 우선 필터링: {len(seafood_ingredients)}개 해산물 재료로 검색")
     elif other_main_ingredients:
-        search_ingredients = other_main_ingredients
-        logger.info(f"다른 메인 재료로 검색: {len(other_main_ingredients)}개")
+        # 메인 재료가 여러 개면 최대 3개까지 조합
+        search_ingredients = other_main_ingredients[:3]
+        logger.info(f"메인 재료 조합 검색: {len(search_ingredients)}개 ({search_ingredients})")
     else:
-        search_ingredients = ingredients
-        logger.info(f"전체 재료로 검색: {len(ingredients)}개")
+        # 메인 재료가 없으면 전체 재료 중 상위 5개 사용
+        search_ingredients = ingredients[:5]
+        logger.info(f"전체 재료 상위 {len(search_ingredients)}개로 검색: {search_ingredients}")
     
     # 메인 재료 목록 (필터링용)
-    main_ingredients = meat_ingredients + other_main_ingredients
+    main_ingredients = meat_ingredients + seafood_ingredients + other_main_ingredients
     
     try:
         from app.services.recipe_crawler import search_recipes_by_ingredients, RecipeCrawlerError
-        # 검색은 메인 재료만 사용하지만, 매칭 계산은 전체 재료 사용
-        crawler_recipes = search_recipes_by_ingredients(search_ingredients, max_results=10, user_ingredients=ingredients)
+        # 검색은 조합된 재료를 사용하지만, 매칭 계산은 전체 재료 사용
+        # 더 많은 결과를 얻기 위해 max_results를 늘림
+        crawler_recipes = search_recipes_by_ingredients(search_ingredients, max_results=20, user_ingredients=ingredients)
         
         # 검색 결과 필터링: 메인 재료가 실제로 포함된 레시피만 선택 (더 엄격하게)
         if main_ingredients and crawler_recipes:
@@ -684,6 +555,24 @@ def search_recipes(state: GraphState) -> Dict[str, Any]:
         llm_recipes = _generate_recipes_with_llm(ingredients)
         if llm_recipes:
             logger.info(f"LLM으로 {len(llm_recipes)}개 레시피 생성")
+    
+    # pre_selected_recipe가 있으면 크롤러 결과에 맨 앞에 추가 (사용자가 선택한 레시피 보존)
+    if pre_selected_recipe:
+        # 중복 제거: 이미 크롤러 결과에 있는지 확인
+        pre_url = pre_selected_recipe.get("url") or pre_selected_recipe.get("source_url")
+        pre_name = pre_selected_recipe.get("name", "")
+        is_duplicate = False
+        
+        for recipe in crawler_recipes:
+            recipe_url = recipe.get("url") or recipe.get("source_url")
+            recipe_name = recipe.get("name", "")
+            if (pre_url and recipe_url == pre_url) or (pre_name and recipe_name == pre_name):
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            crawler_recipes.insert(0, pre_selected_recipe)
+            logger.info(f"pre_selected_recipe를 크롤러 결과 맨 앞에 추가: {pre_name}")
     
     # 각 소스의 결과를 별도로 저장 (compare_and_select_source에서 처리)
     return {
@@ -782,7 +671,9 @@ def _has_main_ingredient_in_recipe(user_ingredients: List[str], recipe_ingredien
 
 
 
-def filter_recipes(state: GraphState) -> Dict[str, Any]:
+# filter_recipes는 filter_module.py에서 import됨
+# 아래 함수는 제거됨 - filter_module.py를 참조하세요
+def _filter_recipes_old(state: GraphState) -> Dict[str, Any]:
     """
     노드 4: 레시피 필터링
     난이도, 조리 시간, 카테고리, 블랙리스트 키워드, 매칭 점수 등으로 필터링
@@ -802,13 +693,19 @@ def filter_recipes(state: GraphState) -> Dict[str, Any]:
     
     filtered_recipes = []
     
-    # 1단계: 블랙리스트 키워드 필터링
+    # 1단계: 블랙리스트 키워드 필터링 및 조리 방법 체크
     for recipe in recipes:
         recipe_name = recipe.get("name", "").lower()
         
         # 블랙리스트 키워드 체크
         if any(keyword in recipe_name for keyword in CATEGORY_BLACKLIST_KEYWORDS):
             logger.info(f"블랙리스트 키워드로 제외: {recipe.get('name')}")
+            continue
+        
+        # 조리 방법이 없는 레시피 제외 (레시피가 아닌 항목 필터링)
+        steps = recipe.get("steps", [])
+        if not steps or len(steps) == 0:
+            logger.info(f"조리 방법 없음으로 제외: {recipe.get('name')}")
             continue
         
         filtered_recipes.append(recipe)
@@ -937,6 +834,9 @@ def select_recipe(state: GraphState) -> Dict[str, Any]:
     """
     recipes = state.get("recipes", [])
     user_choice = state.get("user_choice")
+    selected_recipe_id = state.get("selected_recipe_id")
+    selected_recipe_name = state.get("selected_recipe_name")
+    pre_selected_recipe = state.get("pre_selected_recipe")
     
     if len(recipes) == 0:
         logger.warning("레시피 목록이 비어있습니다.")
@@ -946,54 +846,49 @@ def select_recipe(state: GraphState) -> Dict[str, Any]:
         logger.info(f"단일 레시피 자동 선택: {recipes[0].get('name', 'Unknown')}")
         return {"selected_recipe": recipes[0]}
     
+    # 1순위: recipe_id로 정확히 매칭
+    if selected_recipe_id:
+        for recipe in recipes:
+            recipe_id = recipe.get("id")
+            if recipe_id and str(recipe_id) == str(selected_recipe_id):
+                logger.info(f"레시피 ID로 정확히 매칭: {recipe.get('name', 'Unknown')} (ID: {selected_recipe_id})")
+                return {"selected_recipe": recipe}
+        logger.warning(f"레시피 ID로 매칭 실패: {selected_recipe_id}")
+    
+    # 2순위: recipe_name으로 정확히 매칭
+    if selected_recipe_name:
+        for recipe in recipes:
+            recipe_name = recipe.get("name", "")
+            if recipe_name == selected_recipe_name:
+                logger.info(f"레시피 이름으로 정확히 매칭: {recipe_name}")
+                return {"selected_recipe": recipe}
+        logger.warning(f"레시피 이름으로 매칭 실패: {selected_recipe_name}")
+    
+    # 3순위: pre_selected_recipe와 이름/URL로 매칭
+    if pre_selected_recipe:
+        pre_name = pre_selected_recipe.get("name", "")
+        pre_url = pre_selected_recipe.get("url") or pre_selected_recipe.get("source_url")
+        for recipe in recipes:
+            recipe_name = recipe.get("name", "")
+            recipe_url = recipe.get("url") or recipe.get("source_url")
+            if recipe_name == pre_name or (pre_url and recipe_url == pre_url):
+                logger.info(f"pre_selected_recipe로 매칭: {recipe_name}")
+                return {"selected_recipe": recipe}
+        # 매칭 실패 시 pre_selected_recipe를 그대로 사용
+        logger.warning(f"pre_selected_recipe로 매칭 실패, pre_selected_recipe를 그대로 사용: {pre_name}")
+        return {"selected_recipe": pre_selected_recipe}
+    
+    # 4순위: user_choice 인덱스로 매칭 (하위 호환성)
     if user_choice is not None:
-        selected_recipe_id = state.get("selected_recipe_id")
-        selected_recipe_name = state.get("selected_recipe_name")
-        pre_selected_recipe = state.get("pre_selected_recipe")  # 미리 저장된 레시피 정보
-        
-        # 레시피 ID 또는 이름으로 먼저 찾기 (정확한 매칭)
-        selected = None
-        if selected_recipe_id or selected_recipe_name:
-            for recipe in recipes:
-                recipe_id = recipe.get("id", "")
-                recipe_name = recipe.get("name", "")
-                
-                # ID 매칭 우선
-                if selected_recipe_id and recipe_id == selected_recipe_id:
-                    selected = recipe
-                    logger.info(f"레시피 ID로 매칭: {recipe_name} (ID: {recipe_id})")
-                    break
-                # 이름 매칭
-                elif selected_recipe_name and recipe_name == selected_recipe_name:
-                    selected = recipe
-                    logger.info(f"레시피 이름으로 매칭: {recipe_name}")
-                    break
-        
-        # ID/이름 매칭 실패 시 인덱스로 선택
-        if not selected:
-            if 0 <= user_choice < len(recipes):
-                selected = recipes[user_choice]
-                logger.info(f"사용자 선택 레시피 (인덱스 {user_choice}): {selected.get('name', 'Unknown')}")
-            else:
-                logger.warning(f"유효하지 않은 레시피 인덱스: {user_choice} (총 {len(recipes)}개 레시피)")
-                # 인덱스가 범위를 벗어났지만 미리 저장된 레시피가 있으면 사용
-                if pre_selected_recipe:
-                    selected = pre_selected_recipe
-                    logger.info(f"인덱스 범위 초과, 미리 저장된 레시피 사용: {selected.get('name', 'Unknown')}")
-                else:
-                    # 마지막 수단: 첫 번째 레시피 선택
-                    selected = recipes[0] if recipes else None
-        
-        # 최종적으로 선택된 레시피가 없고 미리 저장된 레시피가 있으면 사용
-        if not selected and pre_selected_recipe:
-            selected = pre_selected_recipe
-            logger.info(f"재검색 결과에 없어서 미리 저장된 레시피 사용: {selected.get('name', 'Unknown')}")
-        
-        if selected:
+        # user_choice가 유효한 범위인지 확인
+        if 0 <= user_choice < len(recipes):
+            selected = recipes[user_choice]
+            logger.info(f"사용자 선택 레시피 (인덱스 {user_choice}): {selected.get('name', 'Unknown')}")
             return {"selected_recipe": selected}
         else:
-            logger.error("선택할 레시피를 찾을 수 없습니다.")
-            return {"error": "선택할 레시피를 찾을 수 없습니다."}
+            logger.warning(f"유효하지 않은 레시피 인덱스: {user_choice} (총 {len(recipes)}개 레시피)")
+            # 인덱스가 범위를 벗어나면 첫 번째 레시피 선택
+            return {"selected_recipe": recipes[0]}
     
     # 여러 개인 경우 상위 10개 반환 (사용자 선택 대기)
     logger.info(f"레시피 {len(recipes)}개 중 상위 10개 반환")
@@ -1195,27 +1090,7 @@ def compare_and_select_source(state: GraphState) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"LLM 레시피 생성 중 오류: {e}")
     
-    # 레시피 이름 기준 중복 제거 (같은 이름의 레시피는 매칭 점수가 높은 것 하나만 남기기)
-    unique_recipes = {}
-    for recipe in filtered_recipes:
-        recipe_name = recipe.get("name", "").strip()
-        if not recipe_name:
-            continue
-        
-        # 레시피 이름 정규화 (공백, 특수문자 정리)
-        normalized_name = recipe_name.lower().strip()
-        
-        if normalized_name not in unique_recipes:
-            unique_recipes[normalized_name] = recipe
-        else:
-            # 이미 존재하면 매칭 점수가 높은 것을 선택
-            existing_score = unique_recipes[normalized_name].get("match_score", 0)
-            current_score = recipe.get("match_score", 0)
-            if current_score > existing_score:
-                unique_recipes[normalized_name] = recipe
-    
-    selected_recipes = list(unique_recipes.values())
-    logger.info(f"레시피 이름 중복 제거 후: {len(filtered_recipes)}개 -> {len(selected_recipes)}개")
+    selected_recipes = filtered_recipes
     logger.info(f"최종 반환할 레시피 수: {len(selected_recipes)}")
     
     # 소스 비교 결과 저장
@@ -1236,6 +1111,49 @@ def compare_and_select_source(state: GraphState) -> Dict[str, Any]:
         logger.info(f"평균 지능형 매칭 점수: {avg_matching_score:.1f}")
     else:
         avg_matching_score = 0.0
+    
+    # 캐시 저장 시도 (DB 연결 실패 시 무시하고 계속 진행)
+    try:
+        db = SessionLocal()
+        ingredients = state.get("ingredients", [])
+        filters = state.get("filters", {})
+        
+        logger.info(f"DB 저장 시작: 레시피 {len(selected_recipes)}개, 재료: {ingredients}")
+        
+        # 레시피들을 DB에 저장하고 ID 수집
+        recipe_ids = []
+        match_scores = {}
+        
+        for recipe in selected_recipes:
+            # 레시피 저장
+            recipe_id = save_recipe(db, recipe)
+            if recipe_id:
+                recipe_ids.append(recipe_id)
+                match_scores[str(recipe_id)] = recipe.get("match_score", 0)
+                logger.info(f"레시피 저장 성공: {recipe.get('name', 'Unknown')} (ID: {recipe_id})")
+            else:
+                logger.warning(f"레시피 저장 실패: {recipe.get('name', 'Unknown')}")
+        
+        # 캐시 저장
+        if recipe_ids:
+            cache_saved = save_search_cache(
+                db=db,
+                ingredients=ingredients,
+                recipe_ids=recipe_ids,
+                match_scores=match_scores,
+                filters=filters,
+                cache_days=7
+            )
+            if cache_saved:
+                logger.info(f"검색 결과 캐시 저장 완료: {len(recipe_ids)}개 레시피")
+            else:
+                logger.warning(f"검색 캐시 저장 실패")
+        else:
+            logger.warning(f"저장할 레시피 ID가 없어서 캐시 저장 안 함")
+        
+        db.close()
+    except Exception as e:
+        logger.error(f"캐시 저장 실패 (기존 로직 계속 진행): {e}", exc_info=True)
     
     return {
         **state,

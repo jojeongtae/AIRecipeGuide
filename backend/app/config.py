@@ -1,8 +1,28 @@
 """
 Application Configuration
 """
+import os
 from pydantic_settings import BaseSettings
 from typing import List
+
+
+def get_cors_origins() -> List[str]:
+    """환경에 따라 CORS origins 자동 설정"""
+    # 환경 변수가 명시적으로 설정되어 있으면 우선 사용
+    cors_env = os.getenv("CORS_ORIGINS")
+    if cors_env:
+        return [origin.strip() for origin in cors_env.split(",")]
+    
+    # 배포 환경 감지 (Railway, Heroku 등)
+    is_production = os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("DYNO") or os.getenv("ENVIRONMENT") == "production"
+    
+    if is_production:
+        # 배포 환경: 프론트엔드 배포 주소 (필요시 .env에서 설정)
+        frontend_url = os.getenv("FRONTEND_URL", "https://your-frontend-domain.com")
+        return [frontend_url]
+    else:
+        # 로컬 환경
+        return ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"]
 
 
 class Settings(BaseSettings):
@@ -22,12 +42,8 @@ class Settings(BaseSettings):
     # Tavily Search API
     TAVILY_API_KEY: str = ""
     
-    # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://disciplined-youthfulness-production-6532.up.railway.app"
-    ]
+    # CORS (환경에 따라 자동 설정)
+    CORS_ORIGINS: List[str] = get_cors_origins()
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -37,6 +53,17 @@ class Settings(BaseSettings):
     CRAWLER_PRIORITY_THRESHOLD: float = 30.0  # 크롤링 우선 선택 임계값
     LLM_GENERATION_THRESHOLD: float = 50.0  # LLM 생성 임계값
     QUALITY_SCORE_INCREMENT: float = 20.0  # 품질 점수 증가량
+    
+    # Database
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "recipe_db"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = ""
+    
+    @property
+    def database_url(self) -> str:
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     class Config:
         env_file = ".env"

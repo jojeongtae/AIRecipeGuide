@@ -46,14 +46,30 @@ export interface SubstitutionSuggestion {
 }
 
 export interface RecipeResponse {
-  recipe?: Recipe
-  nutrition?: NutritionInfo
-  cooking_steps?: CookingStep[]
-  shopping_list?: ShoppingListItem[]
-  substitutions?: SubstitutionSuggestion[]
-  recipes?: Recipe[] // 여러 레시피 옵션
-  search_source?: string // 검색 소스 (tavily, crawler, llm, mixed)
-  search_source_label?: string // 검색 소스 라벨 (표시용)
+  success: boolean
+  data?: {
+    recipe?: Recipe
+    recipes?: Recipe[]
+    nutrition?: NutritionInfo
+    cooking_steps?: CookingStep[]
+    shopping_list?: ShoppingListItem[]
+    substitutions?: SubstitutionSuggestion[]
+    search_source?: string // 검색 소스 (tavily, crawler, llm, mixed)
+    search_source_label?: string // 검색 소스 라벨 (표시용)
+    substitution_guidances?: Array<{
+      user_ingredient: string
+      required_ingredient: string
+      guidance: string
+    }>
+    storage_tips?: Array<{
+      ingredient: string
+      storage_tips: string[]
+      utilization_tips?: string[]
+    }>
+    matched_ingredients?: string[]
+    missing_ingredients?: string[]
+  }
+  error?: string
 }
 
 

@@ -1,100 +1,25 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { recommendRecipe, getRecipeByMenu } from '../services/api'
-import ingredientsData from '../data/ingredients.json'
-import { useAppSelector, useAppDispatch } from '../store/hooks'
-import { addIngredient, removeIngredient, clearIngredients } from '../store/slices/ingredientsSlice'
+import type { Recipe } from '../types/recipe'
+import { useAppSelector } from '../store/hooks'
+import { clearIngredients } from '../store/slices/ingredientsSlice'
+import IngredientInput from '../components/IngredientInput'
+import IngredientCheckboxPanel from '../components/IngredientCheckboxPanel'
+import PersonaSelector from '../components/PersonaSelector'
 
 const HomePage = () => {
   const navigate = useNavigate()
-  const dispatch = useAppDispatch()
   const selectedTags = useAppSelector((state) => state.ingredients.selectedIngredients)
   
-  const [inputValue, setInputValue] = useState('')
   const [menuName, setMenuName] = useState('')
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [showCheckboxPanel, setShowCheckboxPanel] = useState(false)
   const [loading, setLoading] = useState(false)
   const [menuLoading, setMenuLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userPersona, setUserPersona] = useState<'beginner' | 'expert'>('beginner')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const suggestionsRef = useRef<HTMLDivElement>(null)
-
-  // 전체 재료 목록 생성
-  const allIngredients = [
-    ...ingredientsData.baseIngredients.flatMap(cat => cat.items),
-    ...ingredientsData.sauces.flatMap(cat => cat.items)
-  ]
-
-  // 자동완성 필터링
-  useEffect(() => {
-    if (inputValue.trim()) {
-      const filtered = allIngredients.filter(item =>
-        item.includes(inputValue.trim()) && !selectedTags.includes(item)
-      ).slice(0, 8)
-      setSuggestions(filtered)
-      setShowSuggestions(filtered.length > 0)
-    } else {
-      setSuggestions([])
-      setShowSuggestions(false)
-    }
-  }, [inputValue, selectedTags])
-
-  // 외부 클릭 시 자동완성 닫기
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
-      ) {
-        setShowSuggestions(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  // 태그 추가
-  const addTag = (tag: string) => {
-    if (tag.trim() && !selectedTags.includes(tag.trim())) {
-      dispatch(addIngredient(tag.trim()))
-      setInputValue('')
-      setShowSuggestions(false)
-    }
-  }
-
-  // 태그 제거
-  const removeTag = (tag: string) => {
-    dispatch(removeIngredient(tag))
-  }
-
-  // 입력 필드 처리
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value)
-  }
-
-  // Enter 키 처리
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && inputValue.trim()) {
-      e.preventDefault()
-      if (suggestions.length > 0) {
-        addTag(suggestions[0])
-      } else {
-        addTag(inputValue.trim())
-      }
-    } else if (e.key === 'Backspace' && !inputValue && selectedTags.length > 0) {
-      removeTag(selectedTags[selectedTags.length - 1])
-    }
-  }
 
   // 초기화
   const handleReset = () => {
-    dispatch(clearIngredients())
-    setInputValue('')
     setError(null)
   }
 
@@ -135,21 +60,14 @@ const HomePage = () => {
       } else {
         setError(response.error || '레시피를 찾을 수 없습니다.')
       }
-    } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다.')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  // 체크박스 토글
-  const handleCheckboxToggle = (item: string) => {
-    if (selectedTags.includes(item)) {
-      removeTag(item)
-    } else {
-      addTag(item)
-    }
-  }
 
   // 메뉴 이름으로 레시피 검색
   const handleMenuSearch = async (e: React.FormEvent) => {
@@ -173,8 +91,9 @@ const HomePage = () => {
       } else {
         setError(response.error || '레시피를 찾을 수 없습니다.')
       }
-    } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다.')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.'
+      setError(errorMessage)
     } finally {
       setMenuLoading(false)
     }
@@ -252,213 +171,11 @@ const HomePage = () => {
       {/* 재료 입력 폼 */}
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8 mb-8 animate-fade-in border border-gray-100">
         {/* 재료 입력 영역 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <label className="block text-lg font-bold text-gray-800 flex items-center gap-2">
-              <span className="text-2xl">🥬</span>
-              재료를 입력하세요
-            </label>
-            {hasIngredients && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="text-sm text-gray-600 hover:text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-1"
-              >
-                <span>🔄</span>
-                초기화
-              </button>
-            )}
-          </div>
-
-          {/* 태그 입력 필드 */}
-          <div className="relative mb-4">
-            <div className="flex flex-wrap gap-2 p-3 min-h-[60px] border-2 border-gray-200 rounded-xl focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-200 transition-all bg-white">
-              {selectedTags.map((tag: string) => {
-                const isSauce = ingredientsData.sauces.some(cat => cat.items.includes(tag))
-                return (
-                  <span
-                    key={tag}
-                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${
-                      isSauce 
-                        ? 'bg-purple-100 text-purple-700 border border-purple-200' 
-                        : 'bg-orange-100 text-orange-700 border border-orange-200'
-                    }`}
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="hover:opacity-70 focus:outline-none text-lg leading-none"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )
-              })}
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleInputKeyDown}
-                onFocus={() => inputValue.trim() && setShowSuggestions(true)}
-                placeholder={selectedTags.length === 0 ? "재료를 입력하세요 (Enter로 추가)" : ""}
-                className="flex-1 min-w-[200px] outline-none text-gray-700 placeholder-gray-400"
-              />
-            </div>
-
-            {/* 자동완성 드롭다운 */}
-            {showSuggestions && suggestions.length > 0 && (
-              <div
-                ref={suggestionsRef}
-                className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
-              >
-                {suggestions.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => addTag(suggestion)}
-                    className="w-full text-left px-4 py-2 hover:bg-orange-50 transition-colors flex items-center gap-2"
-                  >
-                    <span className="text-orange-500">+</span>
-                    <span className="text-gray-700">{suggestion}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 재료 목록에서 선택 버튼 */}
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => setShowCheckboxPanel(!showCheckboxPanel)}
-              className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
-            >
-              <span>{showCheckboxPanel ? '▼' : '▶'}</span>
-              재료 목록에서 선택
-            </button>
-          </div>
-
-          {/* 접을 수 있는 체크박스 패널 */}
-          {showCheckboxPanel && (
-            <div className="grid md:grid-cols-2 gap-6 mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              {/* 좌측: 일반 재료 */}
-              <div>
-                <h3 className="text-md font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <span className="text-lg">🥘</span>
-                  일반 재료
-                </h3>
-                <div className="max-h-64 overflow-y-auto space-y-3">
-                  {ingredientsData.baseIngredients.map((category) => (
-                    <div key={category.category} className="mb-3">
-                      <h4 className="text-xs font-semibold text-gray-600 mb-2">
-                        {category.category}
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {category.items.map((item) => (
-                          <label
-                            key={item}
-                            className="flex items-center gap-1.5 cursor-pointer hover:bg-white px-2 py-1 rounded transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedTags.includes(item)}
-                              onChange={() => handleCheckboxToggle(item)}
-                              className="w-3.5 h-3.5 text-orange-500 border-gray-300 rounded focus:ring-orange-400"
-                            />
-                            <span className="text-xs text-gray-700">{item}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 우측: 소스/양념 */}
-              <div>
-                <h3 className="text-md font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <span className="text-lg">🧂</span>
-                  소스/양념
-                </h3>
-                <div className="max-h-64 overflow-y-auto space-y-3">
-                  {ingredientsData.sauces.map((category) => (
-                    <div key={category.category} className="mb-3">
-                      <h4 className="text-xs font-semibold text-gray-600 mb-2">
-                        {category.category}
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {category.items.map((item) => (
-                          <label
-                            key={item}
-                            className="flex items-center gap-1.5 cursor-pointer hover:bg-white px-2 py-1 rounded transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedTags.includes(item)}
-                              onChange={() => handleCheckboxToggle(item)}
-                              className="w-3.5 h-3.5 text-purple-500 border-gray-300 rounded focus:ring-purple-400"
-                            />
-                            <span className="text-xs text-gray-700">{item}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <IngredientInput onReset={handleReset} />
+        <IngredientCheckboxPanel />
 
         {/* 페르소나 선택 */}
-        <div className="mb-6">
-          <label className="block text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <span className="text-2xl">👤</span>
-            나의 요리 실력
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setUserPersona('beginner')}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                userPersona === 'beginner'
-                  ? 'border-orange-500 bg-orange-50 shadow-md'
-                  : 'border-gray-200 bg-white hover:border-orange-200 hover:bg-orange-50'
-              }`}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-3xl">🌱</span>
-                <span className={`font-semibold ${userPersona === 'beginner' ? 'text-orange-700' : 'text-gray-700'}`}>
-                  초보자
-                </span>
-                <span className={`text-xs text-center ${userPersona === 'beginner' ? 'text-orange-600' : 'text-gray-500'}`}>
-                  용어 설명, 단계별 가이드
-                </span>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserPersona('expert')}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                userPersona === 'expert'
-                  ? 'border-purple-500 bg-purple-50 shadow-md'
-                  : 'border-gray-200 bg-white hover:border-purple-200 hover:bg-purple-50'
-              }`}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-3xl">🔥</span>
-                <span className={`font-semibold ${userPersona === 'expert' ? 'text-purple-700' : 'text-gray-700'}`}>
-                  숙련가
-                </span>
-                <span className={`text-xs text-center ${userPersona === 'expert' ? 'text-purple-600' : 'text-gray-500'}`}>
-                  효율적 조리법, 고급 기법
-                </span>
-              </div>
-            </button>
-          </div>
-        </div>
+        <PersonaSelector value={userPersona} onChange={setUserPersona} />
 
         {error && (
           <div className="bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 text-red-700 px-5 py-4 rounded-xl mb-6 shadow-md animate-slide-in flex items-center gap-2">

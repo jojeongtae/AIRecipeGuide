@@ -1,11 +1,17 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { selectRecipe } from '../services/api'
+import type { Recipe } from '../types/recipe'
 
 const RecipeResultsPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { recipes = [], searchSource = null, menuName = null, userPersona = 'beginner' } = (location.state as any) || {}
+  const { recipes = [], searchSource = null, menuName = null, userPersona = 'beginner' } = (location.state as { 
+    recipes?: Recipe[]
+    searchSource?: string | null
+    menuName?: string | null
+    userPersona?: 'beginner' | 'expert'
+  }) || {}
   
   const [loading, setLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState<string>('')
@@ -77,10 +83,11 @@ const RecipeResultsPage = () => {
         setLoadingStage('')
         setLoadingProgress(0)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(stageTimer)
       clearTimeout(stageTimer2)
-      setError(err.message || '오류가 발생했습니다.')
+      const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.'
+      setError(errorMessage)
       setLoadingStage('')
       setLoadingProgress(0)
     } finally {
@@ -166,7 +173,7 @@ const RecipeResultsPage = () => {
 
       {/* 레시피 리스트 */}
       <div className="space-y-4">
-        {recipes.map((recipe: any, index: number) => (
+        {recipes.map((recipe: Recipe, index: number) => (
           <div
             key={recipe.id || index}
             className="bg-white border-2 border-gray-200 rounded-xl p-5 hover:border-orange-300 hover:shadow-lg cursor-pointer transition-all transform hover:scale-[1.02] animate-slide-in"

@@ -6,6 +6,9 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from app.models.state import GraphState, Difficulty, UserPersona
 from app.graph.graph import recipe_graph
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -85,6 +88,10 @@ async def recommend_recipe(request: RecipeRequest):
     """
     재료 기반 레시피 추천
     """
+    from app.utils.logger import get_logger
+    logger = get_logger(__name__)
+    logger.info(f"레시피 추천 요청: 재료={request.ingredients}, 페르소나={request.user_persona}")
+    
     try:
         # user_persona 처리
         user_persona_enum = None
@@ -105,9 +112,6 @@ async def recommend_recipe(request: RecipeRequest):
         )
         
         from app.graph.nodes import input_ingredients, analyze_ingredients, search_recipes, compare_and_select_source, filter_recipes
-        
-        import logging
-        logger = logging.getLogger(__name__)
         
         state = input_ingredients(initial_state)
         logger.info(f"입력 재료: {state.get('ingredients', [])}")
@@ -170,9 +174,6 @@ async def select_recipe(
     여러 레시피 중 하나 선택
     """
     try:
-        import logging
-        logger = logging.getLogger(__name__)
-        
         # user_persona 처리
         user_persona_enum = None
         if user_persona:
@@ -187,6 +188,8 @@ async def select_recipe(
             user_persona=user_persona_enum
         )
         initial_state["user_choice"] = recipe_index
+        logger.info(f"레시피 선택 요청: index={recipe_index}, recipe_id={recipe_id}, recipe_name={recipe_name}")
+        
         # 선택한 레시피를 정확히 식별하기 위한 정보 추가
         if recipe_id:
             initial_state["selected_recipe_id"] = recipe_id
@@ -202,29 +205,59 @@ async def select_recipe(
             except Exception as e:
                 logger.warning(f"레시피 데이터 파싱 실패: {e}")
         
+        logger.info("레시피 상세정보 생성 시작...")
         result = recipe_graph.invoke(initial_state)
         
         if result.get("error"):
+            logger.error(f"레시피 처리 중 오류: {result.get('error')}")
             return RecipeResponse(
                 success=False,
                 error=result.get("error", "레시피 처리 중 오류가 발생했습니다.")
             )
         
         if not result.get("final_output"):
+            logger.warning("레시피 정보를 생성할 수 없습니다.")
             return RecipeResponse(
                 success=False,
                 error="레시피 정보를 생성할 수 없습니다."
             )
         
+        final_output = result.get("final_output", {})
+        recipe_name = final_output.get("recipe", {}).get("name") if isinstance(final_output.get("recipe"), dict) else "Unknown"
+        logger.info(f"레시피 상세정보 생성 완료: {recipe_name}")
+        
+        # 레시피 상세정보 DB 저장 시도
+        try:
+            from app.database import SessionLocal
+            from app.services.db_service import save_recipe
+            
+            recipe_data = final_output.get("recipe", {})
+            if recipe_data:
+                db = SessionLocal()
+                # 상세정보 포함하여 저장 (영양정보, 최적화된 조리단계 등)
+                recipe_data_to_save = recipe_data.copy()
+                # final_output에서 추가 정보 가져오기
+                if final_output.get("nutrition"):
+                    recipe_data_to_save["nutrition_info"] = final_output.get("nutrition")
+                if final_output.get("cooking_steps"):
+                    recipe_data_to_save["steps"] = final_output.get("cooking_steps")
+                
+                recipe_id = save_recipe(db, recipe_data_to_save)
+                if recipe_id:
+                    logger.info(f"레시피 상세정보 DB 저장 완료: {recipe_id} ({recipe_name})")
+                else:
+                    logger.warning(f"레시피 상세정보 DB 저장 실패: {recipe_name}")
+                db.close()
+        except Exception as e:
+            logger.warning(f"레시피 상세정보 DB 저장 중 오류 (기존 로직 계속 진행): {e}")
+        
         return RecipeResponse(
             success=True,
-            data=result.get("final_output")
+            data=final_output
         )
         
     except Exception as e:
         import traceback
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"레시피 선택 오류: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"레시피 선택 중 오류가 발생했습니다: {str(e)}")
@@ -240,9 +273,6 @@ async def get_recipe_by_menu(
     메뉴 이름 기반 레시피 검색 + 재료 확인
     """
     try:
-        import logging
-        logger = logging.getLogger(__name__)
-        
         # 재료 목록 파싱
         user_ingredients_list = [ing.strip() for ing in ingredients.split(",") if ing.strip()]
         
@@ -328,8 +358,6 @@ async def get_recipe_by_menu(
         
     except Exception as e:
         import traceback
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"메뉴 기반 레시피 검색 오류: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"레시피 검색 중 오류가 발생했습니다: {str(e)}")

@@ -233,6 +233,57 @@ def check_ingredients(state: GraphState) -> Dict[str, Any]:
 
 
 
+def _is_valid_ingredient(ingredient: str) -> bool:
+    """
+    재료가 실제 재료인지 검증 (조리 방법/도구가 아닌지 확인)
+    """
+    if not ingredient or len(ingredient.strip()) < 2:
+        return False
+    
+    ingredient_lower = ingredient.lower().strip()
+    
+    # 조리 방법 키워드 필터링
+    cooking_methods = [
+        '다지기', '볶기', '끓이기', '굽기', '튀기기', '찌기', '삶기', '데치기',
+        '절이기', '무치기', '비빔', '볶음', '구이', '찜', '조림', '튀김',
+        '손으로', '기계로', '가공기', '프로세서'
+    ]
+    
+    # 조리 도구 키워드 필터링
+    cooking_tools = [
+        '도마', '조리용나이프', '요리나이프', '가위', '유리볼', '요리스푼',
+        '냄비', '프라이팬', '팬', '볼', '그릇', '접시', '칼', '나이프',
+        '에어프라이어', '오븐', '전자레인지', '믹서', '블렌더'
+    ]
+    
+    # 동사 형태 필터링 (예: "손으로 다지기", "기계로 다지기")
+    action_patterns = [
+        r'.*다지기$', r'.*자르기$', r'.*썰기$', r'.*볶기$', r'.*끓이기$',
+        r'.*굽기$', r'.*튀기기$', r'.*찌기$', r'.*삶기$', r'.*데치기$'
+    ]
+    
+    # 조리 방법/도구 키워드가 포함되어 있으면 재료가 아님
+    for method in cooking_methods:
+        if method in ingredient_lower:
+            return False
+    
+    for tool in cooking_tools:
+        if tool in ingredient_lower:
+            return False
+    
+    # 동사 패턴 매칭
+    import re
+    for pattern in action_patterns:
+        if re.match(pattern, ingredient_lower):
+            return False
+    
+    # 너무 짧거나 의미없는 텍스트 제외
+    if len(ingredient_lower) < 2:
+        return False
+    
+    return True
+
+
 def suggest_substitutions(state: GraphState) -> Dict[str, Any]:
     """
     노드 9: 재료 대체 제안 (Self-Correction Loop 지원)
@@ -244,6 +295,9 @@ def suggest_substitutions(state: GraphState) -> Dict[str, Any]:
     ingredient_categories = state.get("ingredient_categories", {})
     selected_recipe = state.get("selected_recipe")
     correction_iteration = state.get("correction_iteration", 0)
+    
+    # 재료가 아닌 것들 필터링
+    missing_ingredients = [ing for ing in missing_ingredients if _is_valid_ingredient(ing)]
     
     if not missing_ingredients:
         return {**state, "substitution_suggestions": []}
@@ -285,10 +339,15 @@ def suggest_substitutions(state: GraphState) -> Dict[str, Any]:
         else:
             formatted_candidates = _suggest_substitutions_with_llm(normalized or missing, category)
         
-        # 사용자가 이미 보유한 재료는 대체재에서 제외
+        # 사용자가 이미 보유한 재료는 대체재에서 제외 + 재료가 아닌 것 필터링
         filtered_candidates = []
         for candidate in formatted_candidates:
-            candidate_name = normalize_for_matching(candidate.get("ingredient", ""))
+            candidate_ingredient = candidate.get("ingredient", "")
+            # 재료가 아닌 것 필터링
+            if not _is_valid_ingredient(candidate_ingredient):
+                continue
+            
+            candidate_name = normalize_for_matching(candidate_ingredient)
             # 사용자가 이미 보유한 재료이거나, 매칭된 재료와 동일하면 제외
             if candidate_name not in user_ingredients_normalized and candidate_name not in matched_ingredients_normalized:
                 filtered_candidates.append(candidate)
@@ -358,6 +417,9 @@ def web_search_substitutions(state: GraphState) -> Dict[str, Any]:
     """
     missing_ingredients = state.get("missing_ingredients", [])
     
+    # 재료가 아닌 것들 필터링
+    missing_ingredients = [ing for ing in missing_ingredients if _is_valid_ingredient(ing)]
+    
     if not missing_ingredients or not settings.TAVILY_API_KEY:
         return {**state, "substitution_suggestions": []}
     
@@ -382,11 +444,13 @@ def web_search_substitutions(state: GraphState) -> Dict[str, Any]:
                 if results and settings.OPENAI_API_KEY:
                     # LLM으로 검색 결과 분석
                     suggestions = _parse_substitution_search_with_llm(results, missing)
-                    if suggestions:
+                    # 재료가 아닌 것 필터링
+                    filtered_suggestions = [s for s in suggestions if _is_valid_ingredient(s.get("ingredient", ""))]
+                    if filtered_suggestions:
                         substitution_suggestions.append({
                             "missing": missing,
                             "normalized": _normalize_ingredient_name(missing),
-                            "suggestions": suggestions,
+                            "suggestions": filtered_suggestions,
                             "source": "tavily"
                         })
             except Exception as e:
@@ -448,8 +512,12 @@ JSON만 응답하고 다른 설명은 하지 마세요."""
         data = json.loads(content)
         suggestions = []
         for entry in data:
+            ingredient = entry.get("ingredient", "")
+            # 재료가 아닌 것 필터링
+            if not _is_valid_ingredient(ingredient):
+                continue
             suggestions.append({
-                "ingredient": entry.get("ingredient"),
+                "ingredient": ingredient,
                 "reason": entry.get("reason", ""),
                 "confidence": float(max(0.0, min(1.0, entry.get("confidence", 0.5)))),
                 "source": "tavily_llm",

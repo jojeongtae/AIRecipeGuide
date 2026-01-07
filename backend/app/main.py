@@ -7,11 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.v1 import router as api_router
 
-# 로깅 설정
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# 로깅 설정 (중앙화된 설정 사용)
+from app.utils.logger import setup_logging
+setup_logging(level=settings.LOG_LEVEL)
 
 app = FastAPI(
     title="Recipe Recommendation API",
@@ -65,4 +63,6 @@ if __name__ == "__main__":
         host=settings.API_HOST,
         port=settings.API_PORT,
         reload=settings.API_RELOAD,
+        log_level="info",  # uvicorn 로그 레벨 설정
+        access_log=True,  # access log 활성화
     )

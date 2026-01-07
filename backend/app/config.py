@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     QUALITY_SCORE_INCREMENT: float = 20.0  # 품질 점수 증가량
     
     # Database
+    # Railway는 DATABASE_URL 환경 변수를 자동으로 제공합니다
+    # 로컬 환경에서는 개별 환경 변수 사용
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "recipe_db"
@@ -63,6 +65,15 @@ class Settings(BaseSettings):
     
     @property
     def database_url(self) -> str:
+        # Railway나 다른 플랫폼에서 DATABASE_URL이 제공되면 우선 사용
+        database_url_env = os.getenv("DATABASE_URL")
+        if database_url_env:
+            # Railway는 postgres://로 시작하지만 SQLAlchemy는 postgresql://를 요구
+            if database_url_env.startswith("postgres://"):
+                database_url_env = database_url_env.replace("postgres://", "postgresql://", 1)
+            return database_url_env
+        
+        # 로컬 환경: 개별 환경 변수로 구성
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     class Config:

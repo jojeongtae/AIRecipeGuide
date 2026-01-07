@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import type { Recipe, CookingStep, ShoppingListItem, RecipeResponse, SubstitutionSuggestion } from '../types/recipe'
+import type { CookingStep, ShoppingListItem, RecipeResponse, SubstitutionSuggestion } from '../types/recipe'
 // import { selectRecipe } from '../services/api' // 주석처리 (1인분 고정)
 
 const RecipeDetailPage = () => {
@@ -13,8 +13,8 @@ const RecipeDetailPage = () => {
   const [loadingStage] = useState<string>('')
   const [loadingProgress] = useState<number>(0)
   const [error] = useState<string | null>(null)
-  const [recipe] = useState(recipeData?.recipe || null)
-  const [fullData] = useState(recipeData || null)
+  const [recipe] = useState(recipeData?.data?.recipe || null)
+  const [fullData] = useState<RecipeResponse['data'] | null>(recipeData?.data || null)
 
   useEffect(() => {
     if (!recipeData) {

@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { recommendRecipe, selectRecipe } from '../services/api'
-import type { RecipeResponse } from '../types/recipe'
+import type { RecipeResponse, Recipe, CookingStep, ShoppingListItem, SubstitutionSuggestion } from '../types/recipe'
 import { useAppSelector } from '../store/hooks'
-import { clearIngredients } from '../store/slices/ingredientsSlice'
 import IngredientInput from './IngredientInput'
 import IngredientCheckboxPanel from './IngredientCheckboxPanel'
 import PersonaSelector from './PersonaSelector'
@@ -102,7 +101,7 @@ const RecipeRecommendation = () => {
       clearTimeout(substitutionTimer)
       
       if (response.success && response.data) {
-        setResult(response.data)
+        setResult(response)
         setRecipeOptions([])
         setLoadingStage('')
         // 레시피의 기본 인분 수로 servingSize 업데이트 - 주석처리 (1인분 고정)
@@ -285,20 +284,20 @@ const RecipeRecommendation = () => {
         </div>
       )}
 
-      {result && (
+      {result && result.data && (
         <div className="bg-white rounded-2xl shadow-xl p-8 animate-fade-in border border-gray-100">
-          {result.recipe && (
+          {result.data.recipe && (
             <>
               <div className="mb-6 pb-6 border-b-2 border-gray-200">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <h2 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3">
                       <span className="text-4xl">🍲</span>
-                      {result.recipe.name}
+                      {result.data.recipe.name}
                     </h2>
-                    {(result.recipe as any).category && (
+                    {result.data.recipe.category && (
                       <span className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-full text-sm font-medium">
-                        {(result.recipe as any).category}
+                        {result.data.recipe.category}
                       </span>
                     )}
                   </div>
@@ -334,11 +333,11 @@ const RecipeRecommendation = () => {
                   </div>
                 </div>
                 {/* 레시피 대표 이미지 */}
-                {(result.recipe as any).image && (
+                {result.data.recipe?.image && (
                   <div className="w-full h-64 rounded-xl overflow-hidden bg-gray-200 mb-4">
                     <img
-                      src={(result.recipe as any).image}
-                      alt={result.recipe.name}
+                      src={result.data.recipe.image}
+                      alt={result.data.recipe.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
@@ -359,13 +358,13 @@ const RecipeRecommendation = () => {
                     필요한 재료
                   </h3>
                   <div className="space-y-4">
-                    {(result as any).matched_ingredients && (result as any).matched_ingredients.length > 0 && (
+                    {result.data.matched_ingredients && result.data.matched_ingredients.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2">
                           <span>✅</span> 보유 재료
                         </h4>
                         <ul className="space-y-2">
-                          {(result as any).matched_ingredients.map((ing: string, idx: number) => (
+                          {result.data.matched_ingredients.map((ing: string, idx: number) => (
                             <li key={idx} className="flex items-center gap-2 text-gray-700 bg-green-50 px-3 py-2 rounded-lg shadow-sm border border-green-200">
                               <span className="text-green-600">✓</span>
                               <span>{ing}</span>
@@ -374,13 +373,13 @@ const RecipeRecommendation = () => {
                         </ul>
                       </div>
                     )}
-                    {(result as any).missing_ingredients && (result as any).missing_ingredients.length > 0 && (
+                    {result.data.missing_ingredients && result.data.missing_ingredients.length > 0 && (
                       <div>
                         <h4 className="text-sm font-semibold text-orange-700 mb-2 flex items-center gap-2">
                           <span>📋</span> 추가 필요
                         </h4>
                         <ul className="space-y-2">
-                          {(result as any).missing_ingredients.map((ing: string, idx: number) => (
+                          {result.data.missing_ingredients.map((ing: string, idx: number) => (
                             <li key={idx} className="flex items-center gap-2 text-gray-700 bg-orange-50 px-3 py-2 rounded-lg shadow-sm border border-orange-200">
                               <span className="text-orange-500">•</span>
                               <span>{ing}</span>
@@ -389,9 +388,9 @@ const RecipeRecommendation = () => {
                         </ul>
                       </div>
                     )}
-                    {(!(result as any).matched_ingredients && !(result as any).missing_ingredients) && (
+                    {(!result.data.matched_ingredients && !result.data.missing_ingredients) && (
                       <ul className="space-y-2">
-                        {result.recipe.ingredients?.map((ing, idx) => (
+                        {result.data.recipe?.ingredients?.map((ing: string, idx: number) => (
                           <li key={idx} className="flex items-center gap-2 text-gray-700 bg-white px-3 py-2 rounded-lg shadow-sm">
                             <span className="text-orange-500">•</span>
                             <span>{ing}</span>
@@ -402,7 +401,7 @@ const RecipeRecommendation = () => {
                   </div>
                 </div>
 
-                {result.nutrition && (
+                {result.data.nutrition && (
                   <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border-2 border-purple-100">
                     <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                       <span className="text-2xl">📊</span>
@@ -410,49 +409,52 @@ const RecipeRecommendation = () => {
                     </h3>
                     <div className="space-y-3">
                       <div className="bg-white px-4 py-2 rounded-lg shadow-sm">
-                        <span className="font-semibold text-orange-600">칼로리:</span> <span className="text-gray-700">{result.nutrition.calories}kcal</span>
+                        <span className="font-semibold text-orange-600">칼로리:</span> <span className="text-gray-700">{result.data.nutrition.calories}kcal</span>
                       </div>
                       <div className="bg-white px-4 py-2 rounded-lg shadow-sm">
-                        <span className="font-semibold text-blue-600">탄수화물:</span> <span className="text-gray-700">{result.nutrition.carbohydrates}g</span>
+                        <span className="font-semibold text-blue-600">탄수화물:</span> <span className="text-gray-700">{result.data.nutrition.carbohydrates}g</span>
                       </div>
                       <div className="bg-white px-4 py-2 rounded-lg shadow-sm">
-                        <span className="font-semibold text-green-600">단백질:</span> <span className="text-gray-700">{result.nutrition.protein}g</span>
+                        <span className="font-semibold text-green-600">단백질:</span> <span className="text-gray-700">{result.data.nutrition.protein}g</span>
                       </div>
                       <div className="bg-white px-4 py-2 rounded-lg shadow-sm">
-                        <span className="font-semibold text-pink-600">지방:</span> <span className="text-gray-700">{result.nutrition.fat}g</span>
+                        <span className="font-semibold text-pink-600">지방:</span> <span className="text-gray-700">{result.data.nutrition.fat}g</span>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {result.cooking_steps && (
+              {result.data.cooking_steps && (
                 <div className="mb-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-6 border-2 border-yellow-100">
                   <h3 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                     <span className="text-2xl">👨‍🍳</span>
                     요리 순서
                   </h3>
                   <ol className="space-y-3">
-                    {result.cooking_steps?.map((step: CookingStep, idx: number) => (
-                      <li key={idx} className="flex gap-3 bg-white px-4 py-3 rounded-lg shadow-sm">
-                        <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full flex items-center justify-center font-bold">
-                          {idx + 1}
-                        </span>
-                        <span className="text-gray-700 pt-0.5">{step.description || step}</span>
-                      </li>
-                    ))}
+                    {result.data.cooking_steps?.map((step: CookingStep, idx: number) => {
+                      const stepDescription = typeof step === 'string' ? step : step.description || step.step?.toString() || ''
+                      return (
+                        <li key={idx} className="flex gap-3 bg-white px-4 py-3 rounded-lg shadow-sm">
+                          <span className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full flex items-center justify-center font-bold">
+                            {idx + 1}
+                          </span>
+                          <span className="text-gray-700 pt-0.5">{stepDescription}</span>
+                        </li>
+                      )
+                    })}
                   </ol>
                 </div>
               )}
 
-              {result.shopping_list && result.shopping_list.length > 0 && (
+              {result.data.shopping_list && result.data.shopping_list.length > 0 && (
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-6 shadow-md">
                   <h3 className="text-2xl font-bold text-yellow-800 mb-4 flex items-center gap-2">
                     <span className="text-2xl">🛒</span>
                     쇼핑 리스트
                   </h3>
                   <ul className="space-y-2">
-                    {result.shopping_list?.map((item: ShoppingListItem, idx: number) => (
+                    {result.data.shopping_list?.map((item: ShoppingListItem, idx: number) => (
                       <li key={idx} className="bg-white px-4 py-2 rounded-lg shadow-sm text-yellow-800">
                         <span className="font-semibold">{item.display || item.ingredient}</span>
                         {item.quantity && (
@@ -465,14 +467,14 @@ const RecipeRecommendation = () => {
                 </div>
               )}
 
-              {result.substitutions && result.substitutions.length > 0 && (
+              {result.data.substitutions && result.data.substitutions.length > 0 && (
                 <div className="mt-8 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6 shadow-md">
                   <h3 className="text-2xl font-bold text-green-800 mb-4 flex items-center gap-2">
                     <span className="text-2xl">🔄</span>
                     대체 재료 제안
                   </h3>
                   <div className="space-y-4">
-                    {result.substitutions?.map((item: SubstitutionSuggestion, idx: number) => (
+                    {result.data.substitutions?.map((item: SubstitutionSuggestion, idx: number) => (
                       <div key={`${item.missing}-${idx}`} className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
                         <div className="flex items-center justify-between mb-2">
                           <div className="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -481,7 +483,7 @@ const RecipeRecommendation = () => {
                           </div>
                         </div>
                         <ul className="space-y-3">
-                          {item.suggestions.map((suggestion, sIdx) => (
+                          {item.suggestions.map((suggestion, sIdx: number) => (
                             <li key={`${suggestion.ingredient}-${sIdx}`} className="border border-green-100 rounded-lg p-3 bg-green-50/50">
                               <div className="flex items-center justify-between mb-1">
                                 <span className="font-semibold text-gray-800">{suggestion.ingredient}</span>

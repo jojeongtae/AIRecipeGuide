@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import type { Recipe, CookingStep, ShoppingListItem, SubstitutionSuggestion } from '../types/recipe'
+import type { Recipe, CookingStep, ShoppingListItem, RecipeResponse, SubstitutionSuggestion } from '../types/recipe'
 // import { selectRecipe } from '../services/api' // 주석처리 (1인분 고정)
 
 const RecipeDetailPage = () => {
@@ -288,7 +288,7 @@ const RecipeDetailPage = () => {
               대체 재료 제안
             </h3>
             <div className="space-y-4">
-              {fullData.substitutions.map((item: any, idx: number) => (
+              {fullData.substitutions.map((item: SubstitutionSuggestion, idx: number) => (
                 <div key={`${item.missing}-${idx}`} className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-lg font-semibold text-gray-800 flex items-center gap-2">

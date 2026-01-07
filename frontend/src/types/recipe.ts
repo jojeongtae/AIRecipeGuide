@@ -9,6 +9,9 @@ export interface Recipe {
   image?: string  // 레시피 이미지 URL
   serving_size?: number  // 인분 수
   category?: string  // 카테고리 (메인요리, 후식, 반찬, 국/찌개 등)
+  level?: string  // 난이도 (difficulty와 동일, 하위 호환성)
+  match_rate?: number  // 매칭률 (0.0~1.0 또는 0~100)
+  missing_ingredients?: string[]  // 부족한 재료 목록
 }
 
 export interface NutritionInfo {

@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     
     # API Settings
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 5000
+    API_PORT: int = int(os.getenv("PORT", "5000"))  # Railway는 $PORT 환경 변수 사용
     API_RELOAD: bool = True
     
     # LLM Provider

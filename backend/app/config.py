@@ -18,8 +18,16 @@ def get_cors_origins() -> List[str]:
     
     if is_production:
         # 배포 환경: 프론트엔드 배포 주소 (필요시 .env에서 설정)
-        frontend_url = os.getenv("FRONTEND_URL", "https://your-frontend-domain.com")
-        return [frontend_url]
+        frontend_url = os.getenv("FRONTEND_URL")
+        if frontend_url:
+            # 여러 URL이 쉼표로 구분되어 있을 수 있음
+            return [url.strip() for url in frontend_url.split(",")]
+        else:
+            # FRONTEND_URL이 없으면 로그 경고 후 빈 리스트 반환
+            # 실제로는 Railway 환경 변수에서 설정해야 함
+            import logging
+            logging.warning("FRONTEND_URL 환경 변수가 설정되지 않았습니다. CORS가 제대로 작동하지 않을 수 있습니다.")
+            return []  # 빈 리스트 (명시적 설정 요구)
     else:
         # 로컬 환경
         return ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"]

@@ -20,9 +20,15 @@ app = FastAPI(
 )
 
 # CORS 설정
+# Railway 환경에서는 FRONTEND_URL 또는 CORS_ORIGINS 환경 변수 설정 필요
+cors_origins = settings.CORS_ORIGINS
+# 빈 리스트이거나 "*"가 포함되어 있으면 모든 origin 허용 (개발용)
+if not cors_origins or "*" in cors_origins:
+    cors_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

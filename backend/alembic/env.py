@@ -63,9 +63,13 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    # settings에서 database_url 가져와서 명시적으로 설정
+    database_url = settings.database_url
+    
+    # engine_from_config 대신 직접 engine 생성
+    from sqlalchemy import create_engine
+    connectable = create_engine(
+        database_url,
         poolclass=pool.NullPool,
     )
 

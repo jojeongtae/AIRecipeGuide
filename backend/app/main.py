@@ -19,17 +19,39 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+
+@app.on_event("startup")
+async def startup_event():
+    """앱 시작 시 실행되는 이벤트"""
+    import os
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 80)
+    logger.info("Application starting up...")
+    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    logger.info(f"API Host: {settings.API_HOST}")
+    logger.info(f"API Port: {settings.API_PORT}")
+    logger.info(f"Database URL configured: {bool(os.getenv('DATABASE_URL'))}")
+    logger.info(f"CORS Origins: {settings.CORS_ORIGINS}")
+    logger.info("=" * 80)
+
 # CORS 설정
 # Railway 환경에서는 FRONTEND_URL 또는 CORS_ORIGINS 환경 변수 설정 필요
 cors_origins = settings.CORS_ORIGINS
-# 빈 리스트이거나 "*"가 포함되어 있으면 모든 origin 허용 (개발용)
-if not cors_origins or "*" in cors_origins:
+# 빈 리스트이거나 "*"가 포함되어 있으면 모든 origin 허용
+# 단, allow_credentials=True와 함께 "*"를 사용할 수 없으므로 주의
+if not cors_origins:
     cors_origins = ["*"]
+elif "*" in cors_origins:
+    cors_origins = ["*"]
+
+# allow_origins=["*"]와 allow_credentials=True는 함께 사용할 수 없음
+# "*"를 사용할 때는 allow_credentials를 False로 설정
+allow_credentials = "*" not in cors_origins
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -50,8 +72,37 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "ok"}
+    """Health check endpoint with DB connection test"""
+    try:
+        # DB 연결 테스트
+        from sqlalchemy import text
+        from app.database import SessionLocal
+        
+        if SessionLocal is None:
+            return {
+                "status": "ok",
+                "database": "not_configured"
+            }
+        
+        db = SessionLocal()
+        try:
+            # 간단한 쿼리로 연결 확인
+            db.execute(text("SELECT 1"))
+            db_status = "connected"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+        finally:
+            db.close()
+        
+        return {
+            "status": "ok",
+            "database": db_status
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
 if __name__ == "__main__":

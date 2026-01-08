@@ -14,7 +14,14 @@ def get_cors_origins() -> List[str]:
         return [origin.strip() for origin in cors_env.split(",")]
     
     # 배포 환경 감지 (Railway, Heroku 등)
-    is_production = os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("DYNO") or os.getenv("ENVIRONMENT") == "production"
+    # Railway는 RAILWAY_ENVIRONMENT를 설정하지 않을 수 있으므로, 
+    # Railway URL 패턴이나 PORT 환경 변수로도 감지
+    is_production = (
+        os.getenv("RAILWAY_ENVIRONMENT") or 
+        os.getenv("DYNO") or 
+        os.getenv("ENVIRONMENT") == "production" or
+        os.getenv("PORT")  # Railway는 PORT 환경 변수를 설정함
+    )
     
     if is_production:
         # 배포 환경: 프론트엔드 배포 주소 (필요시 .env에서 설정)
@@ -23,11 +30,11 @@ def get_cors_origins() -> List[str]:
             # 여러 URL이 쉼표로 구분되어 있을 수 있음
             return [url.strip() for url in frontend_url.split(",")]
         else:
-            # FRONTEND_URL이 없으면 로그 경고 후 빈 리스트 반환
-            # 실제로는 Railway 환경 변수에서 설정해야 함
+            # FRONTEND_URL이 없으면 로그 경고 후 모든 origin 허용 (임시)
+            # 실제로는 Railway 환경 변수에서 FRONTEND_URL을 설정하는 것이 좋음
             import logging
-            logging.warning("FRONTEND_URL 환경 변수가 설정되지 않았습니다. CORS가 제대로 작동하지 않을 수 있습니다.")
-            return []  # 빈 리스트 (명시적 설정 요구)
+            logging.warning("FRONTEND_URL 환경 변수가 설정되지 않았습니다. 모든 origin을 허용합니다.")
+            return ["*"]  # 임시로 모든 origin 허용
     else:
         # 로컬 환경
         return ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"]
@@ -41,8 +48,10 @@ class Settings(BaseSettings):
     
     # API Settings
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = int(os.getenv("PORT", "5000"))  # Railway는 $PORT 환경 변수 사용
-    API_RELOAD: bool = True
+    # 포트 설정: 배포 환경(Railway 등)에서는 $PORT 사용, 로컬에서는 5000 사용
+    API_PORT: int = int(os.getenv("PORT", "5000"))
+    # 프로덕션 환경에서는 reload 비활성화 (Railway 등)
+    API_RELOAD: bool = not bool(os.getenv("PORT") or os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("ENVIRONMENT") == "production")
     
     # LLM Provider
     OPENAI_API_KEY: str = ""
@@ -80,6 +89,13 @@ class Settings(BaseSettings):
             if database_url_env.startswith("postgres://"):
                 database_url_env = database_url_env.replace("postgres://", "postgresql://", 1)
             return database_url_env
+        
+        # Railway 환경 감지
+        is_railway = bool(os.getenv("PORT") or os.getenv("RAILWAY_ENVIRONMENT"))
+        if is_railway:
+            # Railway 환경에서는 DATABASE_URL이 필수
+            import logging
+            logging.warning("Railway 환경에서 DATABASE_URL이 설정되지 않았습니다. PostgreSQL 서비스를 추가해주세요.")
         
         # 로컬 환경: 개별 환경 변수로 구성
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

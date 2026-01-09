@@ -162,11 +162,23 @@ async def health_check():
         }
 
 
+# 로컬 개발 환경에서만 uvicorn.run() 실행
+# Railway 배포 시에는 Start Command "uvicorn app.main:app --host 0.0.0.0 --port $PORT" 사용
+# Railway가 모듈을 import할 때는 이 블록이 실행되지 않으므로 충돌 없음
+# 하지만 안전성을 위해 Railway 환경에서는 실행하지 않도록 추가 체크
 if __name__ == "__main__":
     import uvicorn
     import sys
     import os
     
+    # Railway 환경 감지 (PORT 환경변수가 있으면 Railway)
+    # Railway 환경에서는 Start Command가 직접 uvicorn을 실행하므로 여기서 실행하지 않음
+    if os.getenv("PORT"):
+        print("Railway 환경 감지: uvicorn.run()을 건너뜁니다.")
+        print("Railway Start Command를 사용하세요: uvicorn app.main:app --host 0.0.0.0 --port $PORT")
+        sys.exit(0)
+    
+    # 로컬 개발 환경에서만 실행
     # backend 디렉토리에서 실행되도록 경로 조정
     if os.path.basename(os.getcwd()) == "app":
         os.chdir("..")
@@ -177,6 +189,6 @@ if __name__ == "__main__":
         host=settings.API_HOST,
         port=settings.API_PORT,
         reload=settings.API_RELOAD,
-        log_level="info",  # uvicorn 로그 레벨 설정
-        access_log=True,  # access log 활성화
+        log_level="info",
+        access_log=True,
     )

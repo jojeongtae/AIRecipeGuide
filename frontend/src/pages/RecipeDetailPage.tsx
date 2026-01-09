@@ -20,7 +20,13 @@ const RecipeDetailPage = () => {
     if (!recipeData) {
       navigate('/')
     }
-  }, [recipeData, navigate])
+    // 디버깅: 대체재료 데이터 확인
+    if (fullData) {
+      console.log('fullData:', fullData)
+      console.log('substitutions:', fullData.substitutions)
+      console.log('missing_ingredients:', fullData.missing_ingredients)
+    }
+  }, [recipeData, navigate, fullData])
 
   // const handleServingSizeChange = async (newSize: number) => {
   //   if (newSize < 1 || newSize > 20 || newSize === servingSize) return

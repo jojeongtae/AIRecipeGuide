@@ -294,7 +294,7 @@ def generate_output(state: GraphState) -> Dict[str, Any]:
         "nutrition": nutrition_info,
         "cooking_steps": optimized_steps,  # 반드시 steps 포함
         "shopping_list": shopping_list if shopping_list else None,
-        "substitutions": substitutions if substitutions else None,
+        "substitutions": substitutions if substitutions else [],  # 빈 배열도 유효한 값으로 처리
         "substitution_guidances": substitution_guidances if substitution_guidances else None,  # 대체 재료 가이드 추가
         "storage_tips": storage_tips if storage_tips else None,  # 재료 보관 팁 추가
         # Explainability 정보 추가

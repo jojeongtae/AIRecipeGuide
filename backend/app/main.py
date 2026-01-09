@@ -2,14 +2,19 @@
 FastAPI Main Application
 """
 import logging
-from fastapi import FastAPI
+import traceback
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from app.config import settings
 from app.api.v1 import router as api_router
 
 # 로깅 설정 (중앙화된 설정 사용)
 from app.utils.logger import setup_logging
 setup_logging(level=settings.LOG_LEVEL)
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Recipe Recommendation API",
@@ -56,18 +61,70 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# 요청 로깅 미들웨어
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """모든 요청을 로깅"""
+    try:
+        logger.info(f"Incoming request: {request.method} {request.url.path}")
+        response = await call_next(request)
+        logger.info(f"Response: {request.method} {request.url.path} - {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"Error processing request {request.method} {request.url.path}: {e}", exc_info=True)
+        raise
+
+# 전역 예외 핸들러 추가
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """전역 예외 핸들러 - 모든 예외를 캐치하여 로깅"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(f"Request URL: {request.url}")
+    logger.error(f"Request method: {request.method}")
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": "Internal server error",
+            "message": str(exc) if settings.ENVIRONMENT == "development" else "An error occurred",
+            "type": type(exc).__name__
+        }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """요청 검증 오류 핸들러"""
+    logger.warning(f"Validation error: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"error": "Validation error", "details": exc.errors()}
+    )
+
+
 # API Router 등록
-app.include_router(api_router, prefix="/api/v1")
+try:
+    app.include_router(api_router, prefix="/api/v1")
+    logger.info("API router registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register API router: {e}", exc_info=True)
+    raise
 
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Health check endpoint - Railway uses this for health checks"""
     return {
         "message": "Recipe Recommendation API",
         "version": "1.0.0",
         "status": "healthy"
     }
+
+
+@app.get("/healthz")
+async def healthz():
+    """Alternative health check endpoint"""
+    return {"status": "ok"}
 
 
 @app.get("/health")

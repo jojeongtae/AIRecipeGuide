@@ -50,6 +50,7 @@ const HomePage = () => {
         // 레시피 결과 페이지로 이동 (state로 데이터 전달)
         // setTimeout을 사용하여 React 상태 업데이트 후 라우팅 실행
         const data = response.data
+        setLoading(false) // 로딩 상태 해제
         setTimeout(() => {
           navigate('/recipes', { 
             state: { 
@@ -86,6 +87,7 @@ const HomePage = () => {
         // 레시피 목록 페이지로 이동 (여러 레시피 선택 가능)
         // setTimeout을 사용하여 React 상태 업데이트 후 라우팅 실행
         const data = response.data
+        setMenuLoading(false) // 로딩 상태 해제
         setTimeout(() => {
           navigate('/recipes', {
             state: {

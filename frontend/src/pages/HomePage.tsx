@@ -48,20 +48,24 @@ const HomePage = () => {
 
       if (response.success && response.data) {
         // 레시피 결과 페이지로 이동 (state로 데이터 전달)
-        navigate('/recipes', { 
-          state: { 
-            recipes: response.data.recipes || [],
-            searchSource: response.data.search_source_label || response.data.search_source || null,
-            userPersona: userPersona
-          } 
-        })
+        // setTimeout을 사용하여 React 상태 업데이트 후 라우팅 실행
+        const data = response.data
+        setTimeout(() => {
+          navigate('/recipes', { 
+            state: { 
+              recipes: data.recipes || [],
+              searchSource: data.search_source_label || data.search_source || null,
+              userPersona: userPersona
+            } 
+          })
+        }, 0)
       } else {
         setError(response.error || '레시피를 찾을 수 없습니다.')
+        setLoading(false)
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.'
       setError(errorMessage)
-    } finally {
       setLoading(false)
     }
   }
@@ -80,19 +84,23 @@ const HomePage = () => {
 
       if (response.success && response.data) {
         // 레시피 목록 페이지로 이동 (여러 레시피 선택 가능)
-        navigate('/recipes', {
-          state: {
-            recipes: response.data.recipes || [],
-            menuName: menuName.trim()  // 메뉴 이름도 함께 전달
-          }
-        })
+        // setTimeout을 사용하여 React 상태 업데이트 후 라우팅 실행
+        const data = response.data
+        setTimeout(() => {
+          navigate('/recipes', {
+            state: {
+              recipes: data.recipes || [],
+              menuName: menuName.trim()  // 메뉴 이름도 함께 전달
+            }
+          })
+        }, 0)
       } else {
         setError(response.error || '레시피를 찾을 수 없습니다.')
+        setMenuLoading(false)
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.'
       setError(errorMessage)
-    } finally {
       setMenuLoading(false)
     }
   }

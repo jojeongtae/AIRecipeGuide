@@ -28,13 +28,22 @@ def get_cors_origins() -> List[str]:
         frontend_url = os.getenv("FRONTEND_URL")
         if frontend_url:
             # 여러 URL이 쉼표로 구분되어 있을 수 있음
-            return [url.strip() for url in frontend_url.split(",")]
+            origins = [url.strip() for url in frontend_url.split(",")]
+            # Railway 배포 도메인도 포함
+            railway_backend_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+            if railway_backend_domain and railway_backend_domain not in origins:
+                origins.append(f"https://{railway_backend_domain}")
+            return origins
         else:
-            # FRONTEND_URL이 없으면 로그 경고 후 모든 origin 허용 (임시)
-            # 실제로는 Railway 환경 변수에서 FRONTEND_URL을 설정하는 것이 좋음
+            # FRONTEND_URL이 없으면 Railway 배포 도메인 확인 또는 모든 origin 허용
             import logging
-            logging.warning("FRONTEND_URL 환경 변수가 설정되지 않았습니다. 모든 origin을 허용합니다.")
-            return ["*"]  # 임시로 모든 origin 허용
+            railway_backend_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+            if railway_backend_domain:
+                logging.info(f"Railway 배포 도메인 사용: https://{railway_backend_domain}")
+                return [f"https://{railway_backend_domain}", "*"]
+            else:
+                logging.warning("FRONTEND_URL 환경 변수가 설정되지 않았습니다. 모든 origin을 허용합니다.")
+                return ["*"]  # 임시로 모든 origin 허용
     else:
         # 로컬 환경
         return ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"]

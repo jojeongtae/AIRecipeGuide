@@ -24,22 +24,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-
-@app.on_event("startup")
-async def startup_event():
-    """앱 시작 시 실행되는 이벤트"""
-    import os
-    logger = logging.getLogger(__name__)
-    logger.info("=" * 80)
-    logger.info("Application starting up...")
-    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    logger.info(f"API Host: {settings.API_HOST}")
-    logger.info(f"API Port: {settings.API_PORT}")
-    logger.info(f"Database URL configured: {bool(os.getenv('DATABASE_URL'))}")
-    logger.info(f"CORS Origins: {settings.CORS_ORIGINS}")
-    logger.info("=" * 80)
-
-# CORS 설정
+# CORS 설정 - app 생성 직후 등록 (FastAPI 모범 사례)
 # Railway 환경에서는 FRONTEND_URL 또는 CORS_ORIGINS 환경 변수 설정 필요
 cors_origins = settings.CORS_ORIGINS
 # 빈 리스트이거나 "*"가 포함되어 있으면 모든 origin 허용
@@ -60,6 +45,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """앱 시작 시 실행되는 이벤트"""
+    import os
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 80)
+    logger.info("Application starting up...")
+    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    logger.info(f"API Host: {settings.API_HOST}")
+    logger.info(f"API Port: {settings.API_PORT}")
+    logger.info(f"Database URL configured: {bool(os.getenv('DATABASE_URL'))}")
+    logger.info(f"CORS Origins: {settings.CORS_ORIGINS}")
+    logger.info("=" * 80)
 
 
 # 요청 로깅 미들웨어

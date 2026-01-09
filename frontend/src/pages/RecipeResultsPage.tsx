@@ -72,12 +72,15 @@ const RecipeResultsPage = () => {
 
       if (response.success && response.data) {
         // 레시피 상세 페이지로 이동
-        navigate('/recipe', { 
-          state: { 
-            recipeData: response.data,
-            searchSource: searchSource
-          } 
-        })
+        // response 전체를 전달해야 RecipeDetailPage에서 recipeData.data.recipe로 접근 가능
+        setTimeout(() => {
+          navigate('/recipe', { 
+            state: { 
+              recipeData: response, // 전체 RecipeResponse 객체 전달
+              searchSource: searchSource
+            } 
+          })
+        }, 100) // 100ms 지연으로 React 상태 업데이트 완료 대기
       } else {
         setError(response.error || '레시피를 불러올 수 없습니다.')
         setLoadingStage('')

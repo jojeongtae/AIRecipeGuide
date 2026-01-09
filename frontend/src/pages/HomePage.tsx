@@ -59,7 +59,7 @@ const HomePage = () => {
               userPersona: userPersona
             } 
           })
-        }, 0)
+        }, 100) // 100ms 지연으로 React 상태 업데이트 완료 대기
       } else {
         setError(response.error || '레시피를 찾을 수 없습니다.')
         setLoading(false)
@@ -95,7 +95,7 @@ const HomePage = () => {
               menuName: menuName.trim()  // 메뉴 이름도 함께 전달
             }
           })
-        }, 0)
+        }, 100) // 100ms 지연으로 React 상태 업데이트 완료 대기
       } else {
         setError(response.error || '레시피를 찾을 수 없습니다.')
         setMenuLoading(false)

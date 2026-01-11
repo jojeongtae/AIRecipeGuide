@@ -5,9 +5,7 @@ python-multipart==0.0.6
 
 # LangGraph & LangChain
 langgraph>=1.0.0  # LangGraph 1.0+ required for interrupt, checkpointer, streaming features
-langchain>=0.1.0
-langchain-openai>=0.0.2
-langchain-community>=0.0.10
+# langchain-community 제거: 코드에서 사용하지 않으며 무거운 패키지로 빌드 타임아웃 발생
 
 # OpenAI
 openai>=1.0.0
@@ -33,8 +31,8 @@ lxml>=4.9.0
 python-dotenv==1.0.0
 
 # Utilities
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+# python-jose[cryptography]==3.3.0
+# passlib[bcrypt]==1.7.4
 
-# Search API
-tavily-python>=0.3.0
+# Search API (현재 사용하지 않음 - 초보자 모드는 크롤러만 사용)
+# tavily-python>=0.3.0

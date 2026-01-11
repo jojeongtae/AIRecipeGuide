@@ -254,9 +254,9 @@ def generate_output(state: GraphState) -> Dict[str, Any]:
                 {"step": 3, "description": "완성합니다.", "time": 5}
             ]
     
-    # 인분 수 조정 (항상 1인분으로 고정)
-    original_servings = recipe_data.get("serving_size", 2)  # 레시피 원본 인분수
-    target_servings = 1  # 항상 1인분으로 고정
+    # 인분 수 조정
+    original_servings = recipe_data.get("serving_size", 2)  # 기본값 2인분
+    target_servings = serving_size if serving_size else original_servings
     
     if target_servings != original_servings and target_servings > 0:
         # 재료 수량 조정
@@ -265,11 +265,10 @@ def generate_output(state: GraphState) -> Dict[str, Any]:
             for ing in recipe_data.get("ingredients", [])
         ]
         recipe_data["ingredients"] = adjusted_ingredients
-        logger.info(f"인분 수 조정: {original_servings}인분 -> {target_servings}인분 (표시 제거)")
-    
-    # serving_size 필드 제거 (표시하지 않음, 항상 1인분 기준)
-    if "serving_size" in recipe_data:
-        del recipe_data["serving_size"]
+        recipe_data["serving_size"] = target_servings
+        logger.info(f"인분 수 조정: {original_servings}인분 -> {target_servings}인분")
+    else:
+        recipe_data["serving_size"] = original_servings
     
     # 재료 보관 팁 포함
     storage_tips = state.get("storage_tips")
@@ -294,7 +293,7 @@ def generate_output(state: GraphState) -> Dict[str, Any]:
         "nutrition": nutrition_info,
         "cooking_steps": optimized_steps,  # 반드시 steps 포함
         "shopping_list": shopping_list if shopping_list else None,
-        "substitutions": substitutions if substitutions else [],  # 빈 배열도 유효한 값으로 처리
+        "substitutions": substitutions if substitutions else None,
         "substitution_guidances": substitution_guidances if substitution_guidances else None,  # 대체 재료 가이드 추가
         "storage_tips": storage_tips if storage_tips else None,  # 재료 보관 팁 추가
         # Explainability 정보 추가
@@ -395,6 +394,123 @@ def collect_user_feedback(state: GraphState) -> Dict[str, Any]:
         "user_feedback": user_feedback,
         "feedback_score": feedback_score
     }
+
+
+# ==================== 초보자 모드 Phase 4 노드 ====================
+
+def generate_final_output(state: GraphState) -> Dict[str, Any]:
+    """
+    Phase 4: 최종 출력 생성 노드 (초보자 모드용)
+    
+    입력:
+    - 가공된 재료 리스트
+    - 가공된 조리 순서
+    - 대체재료 정보
+    - 원본 레시피 메타데이터
+    - 사용자 페르소나
+    동작:
+    - 최종 결과 통합
+    - 원본 출처 정보 포함
+    - 가공 내역 명시
+    - 초보자용: 상세 설명 포함, 실패 방지 팁 포함
+    출력: 페르소나별 최적화된 최종 레시피
+    """
+    structured_recipe = state.get("structured_recipe") or state.get("original_recipe")
+    optimized_steps = state.get("optimized_recipe_steps") or state.get("adapted_recipe_steps")
+    adapted_ingredients = state.get("adapted_ingredients") or structured_recipe.get("ingredients", []) if structured_recipe else []
+    substitution_details = state.get("substitution_details") or {}
+    substitution_mapping = state.get("substitution_mapping") or {}
+    category_analysis = state.get("category_analysis") or {}
+    match_rate = state.get("match_rate", 0.0)
+    matching_score = state.get("matching_score", 0.0)
+    user_persona = state.get("user_persona")
+    
+    if not structured_recipe:
+        return {"error": "레시피 정보가 없습니다."}
+    
+    logger.info(f"최종 출력 생성 시작: {structured_recipe.get('name', 'Unknown')}")
+    
+    try:
+        recipe_name = structured_recipe.get("name", "레시피")
+        
+        # 원본 출처 정보
+        source_info = {
+            "source": structured_recipe.get("source", "만개의레시피"),
+            "source_url": structured_recipe.get("source_url", ""),
+            "popularity_display": structured_recipe.get("popularity_display", "🔥 인기 레시피")
+        }
+        
+        # 메타데이터
+        metadata = {
+            "cooking_time": structured_recipe.get("cooking_time", 30),
+            "difficulty": structured_recipe.get("difficulty", "보통"),
+            "serving_size": structured_recipe.get("serving_size", 2),
+            "image": structured_recipe.get("image", "")
+        }
+        
+        # 대체재료 정보
+        has_substitutions = len(substitution_details) > 0
+        substitution_list = []
+        if has_substitutions:
+            for original, details in substitution_details.items():
+                substitution_list.append({
+                    "original": original,
+                    "substitute": details.get("substitute", ""),
+                    "reason": details.get("reason", ""),
+                    "taste_change": details.get("taste_change", ""),
+                    "usage_tip": details.get("usage_tip", "")
+                })
+        
+        substitution_summary = None
+        if has_substitutions:
+            substitution_summary = f"다음 재료를 대체했습니다: {', '.join([f'{orig} → {sub}' for orig, sub in substitution_mapping.items()])}"
+        
+        # 매칭 정보
+        matching_info = {
+            "match_rate": match_rate,
+            "matching_score": matching_score,
+            "category_analysis": category_analysis
+        }
+        
+        # 초보자용 추가 정보
+        preparation_guide = None
+        general_tips = None
+        
+        if optimized_steps and user_persona == UserPersona.BEGINNER:
+            first_step = optimized_steps[0] if optimized_steps else {}
+            preparation_guide = first_step.get("preparation_guide")
+            general_tips = first_step.get("general_tips", [])
+        
+        # 최종 출력 구조
+        final_output = {
+            "recipe_name": recipe_name,
+            "source_info": source_info,
+            "metadata": metadata,
+            "ingredients": adapted_ingredients,
+            "cooking_steps": optimized_steps or [],
+            "substitutions": {
+                "has_substitutions": has_substitutions,
+                "substitution_list": substitution_list,
+                "summary": substitution_summary
+            },
+            "matching_info": matching_info,
+            "preparation_guide": preparation_guide,
+            "general_tips": general_tips,
+            "persona": user_persona.value if user_persona else "beginner"
+        }
+        
+        logger.info(f"최종 출력 생성 완료: {recipe_name}, 대체재료 {len(substitution_list)}개")
+        
+        return {
+            **state,
+            "final_output": final_output
+        }
+    
+    except Exception as e:
+        logger.error(f"최종 출력 생성 오류: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"error": f"최종 출력 생성 중 오류가 발생했습니다: {str(e)}"}
 
 
 

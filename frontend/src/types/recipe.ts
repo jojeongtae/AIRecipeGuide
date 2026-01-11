@@ -48,6 +48,46 @@ export interface SubstitutionSuggestion {
   suggestions: SubstitutionOption[]
 }
 
+export interface BeginnerFinalOutput {
+  recipe_name: string
+  source_info?: {
+    source: string
+    source_url?: string
+    popularity_display?: string
+  }
+  metadata?: {
+    cooking_time?: number
+    difficulty?: string
+    serving_size?: number
+    image?: string
+  }
+  ingredients?: string[]
+  cooking_steps?: Array<{
+    step?: number
+    description: string
+    [key: string]: any
+  }>
+  substitutions?: {
+    has_substitutions: boolean
+    substitution_list?: Array<{
+      original: string
+      substitute: string
+      reason?: string
+      taste_change?: string
+      usage_tip?: string
+    }>
+    summary?: string
+  }
+  matching_info?: {
+    match_rate?: number
+    matching_score?: number
+    category_analysis?: any
+  }
+  persona?: string
+  preparation_guide?: string
+  general_tips?: string[]
+}
+
 export interface RecipeResponse {
   success: boolean
   data?: {
@@ -71,6 +111,30 @@ export interface RecipeResponse {
     }>
     matched_ingredients?: string[]
     missing_ingredients?: string[]
+    // 초보자 모드 최종 출력
+    final_output?: BeginnerFinalOutput
+    // 초보자 모드 Phase 1 응답
+    thread_id?: string
+    menu_name?: string
+    ingredients_checklist?: {
+      items?: Array<{ name: string; category: string; checked: boolean }>
+      summary?: {
+        total: number
+        auto_checked: number
+        estimated_match_rate: number
+        match_rate_display?: string
+      }
+    }
+    estimated_match_rate?: number
+    waiting_for_selection?: boolean
+    recipe_info?: {
+      name?: string
+      cooking_time?: number
+      difficulty?: string
+      serving_size?: number
+      image?: string
+      popularity_display?: string
+    }
   }
   error?: string
 }

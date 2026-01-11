@@ -57,16 +57,7 @@ _call_openai_api = call_openai_api
 
 
 # 상수 및 헬퍼 함수는 위에서 import됨
-
-def _normalize_ingredient_name(name: str) -> str:
-    """재료명 정규화 (괄호 제거, 공백 정리)"""
-    if not name:
-        return ""
-    normalized = re.sub(r'\([^)]*\)', '', name).strip()
-    normalized = ' '.join(normalized.split())
-    return normalized
-
-
+# _normalize_ingredient_name은 위에서 alias로 이미 설정됨 (중복 정의 삭제됨)
 
 def _suggest_substitutions_with_llm(ingredient: str, category: Optional[str]) -> List[Dict[str, Any]]:
     """LLM을 사용하여 재료 대체제 제안"""
@@ -588,6 +579,42 @@ def modify_recipe_with_substitutions(state: GraphState) -> Dict[str, Any]:
         **state,
         "selected_recipe": updated_recipe,
         "correction_iteration": state.get("correction_iteration", 0) + 1
+    }
+
+
+# ==================== 초보자 모드 Phase 2 노드 ====================
+
+def wait_for_ingredient_selection(state: GraphState) -> Dict[str, Any]:
+    """
+    Phase 2: Human-in-the-Loop - 재료 선택 대기 노드 (초보자 모드)
+    
+    상태: 그래프 중단 (interrupt) 후 재개
+    동작: 사용자가 없는 재료 체크 완료까지 대기
+    입력: 사용자가 체크한 재료 리스트 (user_selected_ingredients = 없는 재료)
+    재개: update 호출로 다음 단계 진행
+    """
+    user_selected_ingredients = state.get("user_selected_ingredients", [])
+    
+    if user_selected_ingredients is None:
+        # 아직 사용자 입력이 없으면 interrupt 상태 유지
+        return {
+            **state,
+            "waiting_for_user_selection": True,
+            "interrupt_reason": "waiting_for_ingredient_selection"
+        }
+    
+    # 체크된 재료 = 없는 재료 (missing_ingredients)로 설정
+    missing_ingredients = user_selected_ingredients
+    
+    logger.info(f"재료 선택 완료: {len(missing_ingredients)}개 없는 재료 선택됨")
+    
+    # interrupt 해제 및 다음 단계로 진행
+    return {
+        **state,
+        "missing_ingredients": missing_ingredients,
+        "user_selected_ingredients": [],  # 빈 리스트로 설정 (보유 재료는 계산으로 처리)
+        "waiting_for_user_selection": False,
+        "interrupt_reason": None
     }
 
 

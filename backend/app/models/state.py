@@ -48,9 +48,6 @@ class GraphState(TypedDict):
     search_source: Optional[str]  # 검색 소스 (tavily, crawler, llm)
     selected_recipe: Optional[Dict[str, Any]]  # 선택된 레시피
     user_choice: Optional[int]  # 사용자가 선택한 레시피 인덱스
-    selected_recipe_id: Optional[str]  # 선택한 레시피 ID (정확한 매칭용)
-    selected_recipe_name: Optional[str]  # 선택한 레시피 이름 (정확한 매칭용)
-    pre_selected_recipe: Optional[Dict[str, Any]]  # 선택한 레시피 전체 정보 (재검색 결과에 없을 때 사용)
     
     # 분석 결과
     nutrition_info: Optional[Dict[str, Any]]  # 영양 정보
@@ -71,7 +68,6 @@ class GraphState(TypedDict):
     
     # Self-Correction Loop 관련
     match_rate: Optional[float]  # 재료 매칭률 (0.0 ~ 1.0)
-    previous_match_rate: Optional[float]  # 이전 매칭률 (Self-Correction Loop 개선용)
     correction_iteration: int  # 수정 반복 횟수
     matched_ingredients: List[str]  # 매칭된 재료
     substitution_guidances: Optional[List[Dict[str, Any]]]  # 대체 재료 사용 시 가이드 메시지
@@ -83,13 +79,6 @@ class GraphState(TypedDict):
     crawler_recipes: Optional[List[Dict[str, Any]]]  # 크롤링 결과
     tavily_recipes: Optional[List[Dict[str, Any]]]  # Tavily 검색 결과
     llm_recipes: Optional[List[Dict[str, Any]]]  # LLM 생성 결과
-    # Phase 3 검증 관련 필드 (Deep Research 재귀 루프용)
-    nutrition_validation_passed: Optional[bool]  # 영양 정보 검증 통과 여부
-    nutrition_validation_issues: Optional[List[str]]  # 영양 정보 검증 이슈
-    nutrition_validation_iteration: int  # 영양 정보 검증 반복 횟수
-    cooking_order_validation_passed: Optional[bool]  # 조리 순서 검증 통과 여부
-    cooking_order_validation_issues: Optional[List[str]]  # 조리 순서 검증 이슈
-    cooking_order_validation_iteration: int  # 조리 순서 검증 반복 횟수
     
     # 페르소나 및 지능형 매칭 관련 필드
     matching_score: Optional[float]  # 지능형 매칭 점수 (0.0 ~ 100.0)
@@ -115,6 +104,25 @@ class GraphState(TypedDict):
     # Human-in-the-loop Feedback 관련 필드
     user_feedback: Optional[Dict[str, Any]]  # 사용자 피드백 데이터
     feedback_score: Optional[int]  # 피드백 점수 (1-5)
+    
+    # 초보자 모드 전용 필드
+    menu_name: Optional[str]  # 메뉴 이름 (예: "김치찌개")
+    original_recipe: Optional[Dict[str, Any]]  # 크롤링한 원본 레시피 데이터
+    structured_recipe: Optional[Dict[str, Any]]  # 구조화된 레시피 데이터
+    extracted_ingredients: Optional[List[str]]  # 추출된 재료 리스트
+    extracted_categories: Optional[Dict[str, str]]  # 재료별 카테고리 매핑
+    ingredients_checklist: Optional[Dict[str, Any]]  # 프론트엔드용 재료 체크리스트
+    grouped_ingredients: Optional[Dict[str, List[str]]]  # 카테고리별 그룹화된 재료
+    estimated_match_rate: Optional[float]  # 예상 매칭률
+    waiting_for_user_selection: Optional[bool]  # 사용자 입력 대기 중인지
+    user_selected_ingredients: Optional[List[str]]  # 사용자가 선택한 재료 리스트
+    interrupt_reason: Optional[str]  # interrupt 이유
+    category_analysis: Optional[Dict[str, Any]]  # 카테고리별 분석 결과
+    adapted_recipe_steps: Optional[List[Dict[str, Any]]]  # 대체재료 반영된 조리법
+    adapted_ingredients: Optional[List[str]]  # 대체재료 반영된 재료 리스트
+    substitution_mapping: Optional[Dict[str, str]]  # 부족 재료 → 대체재료 매핑
+    substitution_details: Optional[Dict[str, Dict[str, Any]]]  # 대체재료 상세 정보
+    optimized_recipe_steps: Optional[List[Dict[str, Any]]]  # 페르소나 최적화된 조리법
 
 
 

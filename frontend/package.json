@@ -11,14 +11,19 @@
     "start:prod": "serve -s dist -l $PORT"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.1.0",
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.6.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.487.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.11.0",
     "redux-persist": "^6.0.0",
-    "serve": "^14.2.5"
+    "serve": "^14.2.5",
+    "tailwind-merge": "^3.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

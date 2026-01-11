@@ -1,19 +1,19 @@
 import axios from 'axios'
 import type { Recipe, RecipeResponse } from '../types/recipe'
 
-// 로컬 ?�경?��? 배포 ?�경?��? ?�동 감�?
+// 로컬 ?�경?��? 배포 ?�경?��? ?�동 감�?
 const getApiBaseUrl = (): string => {
-  // ?�경 변?��? 명시?�으�??�정?�어 ?�으�??�선 ?�용
+  // ?�경 변?��? 명시?�으�??�정?�어 ?�으�??�선 ?�용
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL
   }
   
-  // 개발 ?�경?�거??localhost??경우
+  // 개발 ?�경?�거??localhost??경우
   if (import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:8000'
   }
   
-  // 배포 ?�경 (기본�?
+  // 배포 ?�경 (기본�?
   return 'https://airecipeguide-production.up.railway.app'
 }
 
@@ -36,7 +36,7 @@ export interface RecipeRequest {
   user_persona?: string | null
 }
 
-// RecipeResponse??types/recipe.ts?�서 import
+// RecipeResponse??types/recipe.ts?�서 import
 
 export const recommendRecipe = async (request: RecipeRequest): Promise<RecipeResponse> => {
   const response = await apiClient.post<RecipeResponse>('/api/v1/recipes/recommend', request)
@@ -88,6 +88,7 @@ export interface MenuSearchRequest {
 export interface UpdateRequest {
   thread_id: string
   selected_ingredients: string[]
+  menu_name?: string  // 메뉴 이름 (상태 복원용, Optional)
 }
 
 export const searchMenuForBeginner = async (request: MenuSearchRequest): Promise<RecipeResponse> => {
@@ -95,7 +96,7 @@ export const searchMenuForBeginner = async (request: MenuSearchRequest): Promise
   return response.data
 }
 
-// 초보??모드: ?�료 ?�택 ?�데?�트 (Phase 2-4)
+// 초보??모드: ?�료 ?�택 ?�데?�트 (Phase 2-4)
 export const updateIngredientSelection = async (request: UpdateRequest): Promise<RecipeResponse> => {
   const response = await apiClient.post<RecipeResponse>('/api/v1/recipes/update', request)
   return response.data

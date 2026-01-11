@@ -12,6 +12,7 @@ export interface Recipe {
   level?: string  // 난이도 (difficulty와 동일, 하위 호환성)
   match_rate?: number  // 매칭률 (0.0~1.0 또는 0~100)
   missing_ingredients?: string[]  // 부족한 재료 목록
+  popularity_display?: string  // 인기도 표시 (예: "🔥 조회수 1만회")
 }
 
 export interface NutritionInfo {

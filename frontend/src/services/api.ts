@@ -1,19 +1,19 @@
 import axios from 'axios'
 import type { Recipe, RecipeResponse } from '../types/recipe'
 
-// 로컬 ?�경?��? 배포 ?�경?��? ?�동 감�?
+// 로컬 환경인지 배포 환경인지 자동 감지
 const getApiBaseUrl = (): string => {
-  // ?�경 변?��? 명시?�으�??�정?�어 ?�으�??�선 ?�용
+  // 환경 변수 명시적으로 설정한 경우 사용
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL
   }
   
-  // 개발 ?�경?�거??localhost??경우
+  // 개발 환경인 경우 (localhost 또는 127.0.0.1)
   if (import.meta.env.DEV || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:8000'
   }
   
-  // 배포 ?�경 (기본�?
+  // 배포 환경 (기본값)
   return 'https://airecipeguide-production.up.railway.app'
 }
 
@@ -36,7 +36,7 @@ export interface RecipeRequest {
   user_persona?: string | null
 }
 
-// RecipeResponse??types/recipe.ts?�서 import
+// RecipeResponse types/recipe.ts에서 import
 
 export const recommendRecipe = async (request: RecipeRequest): Promise<RecipeResponse> => {
   const response = await apiClient.post<RecipeResponse>('/api/v1/recipes/recommend', request)
@@ -96,8 +96,18 @@ export const searchMenuForBeginner = async (request: MenuSearchRequest): Promise
   return response.data
 }
 
-// 초보??모드: ?�료 ?�택 ?�데?�트 (Phase 2-4)
+// 초보자모드(Phase 2-4)
 export const updateIngredientSelection = async (request: UpdateRequest): Promise<RecipeResponse> => {
   const response = await apiClient.post<RecipeResponse>('/api/v1/recipes/update', request)
+  return response.data
+}
+// 챗봇
+export interface ChatRequest {
+  question: string
+  menu_name?: string  // 현재 만들고 있는 메뉴 이름 (컨텍스트용)
+}
+
+export const chatWithRecipeBot = async (request: ChatRequest): Promise<RecipeResponse> => {
+  const response = await apiClient.post<RecipeResponse>('/api/v1/recipes/chat', request)
   return response.data
 }

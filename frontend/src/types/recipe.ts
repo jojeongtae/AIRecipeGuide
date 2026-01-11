@@ -136,6 +136,9 @@ export interface RecipeResponse {
       image?: string
       popularity_display?: string
     }
+    // 챗봇 응답
+    answer?: string
+    question?: string
   }
   error?: string
 }

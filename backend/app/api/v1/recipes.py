@@ -405,6 +405,12 @@ class UpdateRequest(BaseModel):
     menu_name: Optional[str] = None  # 메뉴 이름 (상태 복원용)
 
 
+class ChatRequest(BaseModel):
+    """챗봇 질문 요청"""
+    question: str  # 사용자 질문
+    menu_name: Optional[str] = None  # 현재 만들고 있는 메뉴 이름 (컨텍스트용)
+
+
 @router.post("/search", response_model=RecipeResponse)
 async def search_menu_for_beginner(request: MenuSearchRequest):
     """
@@ -438,6 +444,13 @@ async def search_menu_for_beginner(request: MenuSearchRequest):
         try:
             # 그래프 실행 - interrupt까지 실행 (wait_for_ingredient_selection에서 END)
             result = beginner_mode_graph.invoke(initial_state, config=config)
+            
+            # 상태가 checkpointer에 저장되었는지 확인
+            saved_state = beginner_mode_graph.get_state(config)
+            if not saved_state or not saved_state.values:
+                logger.warning(f"그래프 실행 후 상태가 저장되지 않았습니다. thread_id: {thread_id}")
+                # 상태가 없어도 결과는 반환 (결과에 필요한 정보가 있으면)
+            
         except Exception as e:
             logger.error(f"그래프 실행 오류: {e}")
             import traceback
@@ -504,23 +517,54 @@ async def update_ingredient_selection(request: UpdateRequest):
         config = {"configurable": {"thread_id": thread_id}}
         
         try:
-            # 저장된 상태 조회
+            # 저장된 상태 확인
             saved_state = beginner_mode_graph.get_state(config)
             
-            if not saved_state or not saved_state.values:
-                return RecipeResponse(
-                    success=False,
-                    error=f"저장된 상태를 찾을 수 없습니다. thread_id: {thread_id}"
-                )
+            logger.info(f"상태 조회 결과: saved_state={saved_state}, values 존재: {saved_state.values if saved_state else None}")
             
-            # 현재 상태 가져오기
-            current_state = saved_state.values
+            # 상태가 없을 때 menu_name으로 Phase 1 재실행 (상태 복원)
+            if not saved_state or not saved_state.values:
+                logger.warning(f"저장된 상태를 찾을 수 없습니다. thread_id: {thread_id}. menu_name으로 Phase 1 재실행")
+                
+                if not request.menu_name:
+                    return RecipeResponse(
+                        success=False,
+                        error=f"저장된 상태를 찾을 수 없습니다. thread_id: {thread_id}. 메뉴를 다시 검색해주세요."
+                    )
+                
+                # Phase 1 재실행하여 상태 복원
+                from app.graph.nodes import search_menu_recipe, extract_recipe_data, present_ingredients_to_user
+                
+                initial_state = create_initial_state(
+                    user_input=request.menu_name,
+                    user_persona=UserPersona.BEGINNER,
+                    menu_name=request.menu_name
+                )
+                
+                state = search_menu_recipe(initial_state)
+                if state.get("error"):
+                    return RecipeResponse(success=False, error=state["error"])
+                
+                state = extract_recipe_data(state)
+                if state.get("error"):
+                    return RecipeResponse(success=False, error=state["error"])
+                
+                state = present_ingredients_to_user(state)
+                if state.get("error"):
+                    return RecipeResponse(success=False, error=state["error"])
+                
+                current_state = state
+                logger.info(f"Phase 1 재실행 완료. menu_name: {request.menu_name}")
+            else:
+                logger.info(f"상태 확인 완료. thread_id: {thread_id}, 상태 키 수: {len(saved_state.values) if saved_state.values else 0}")
+                # 현재 상태 가져오기
+                current_state = saved_state.values.copy()
             
             # 사용자 선택한 재료로 상태 업데이트
             current_state["user_selected_ingredients"] = selected_ingredients
             current_state["waiting_for_user_selection"] = False  # 재료 선택 완료
             
-            # Phase 2-4 노드들을 직접 호출 (LangGraph 1.0에서는 update() 메서드가 없음)
+            # Phase 2-4 노드들을 직접 호출 (LangGraph의 update() 메서드는 존재하지 않음)
             from app.graph.nodes import (
                 wait_for_ingredient_selection,
                 analyze_user_situation,
@@ -588,3 +632,120 @@ async def update_ingredient_selection(request: UpdateRequest):
         logger.error(f"재료 선택 업데이트 오류: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"재료 선택 업데이트 중 오류가 발생했습니다: {str(e)}")
+
+
+@router.post("/chat", response_model=RecipeResponse)
+async def chat_with_recipe_bot(request: ChatRequest):
+    """
+    요리 챗봇: 요리 관련 질문에 답변
+    
+    요리 관련 질문만 받도록 필터링하고, 대체재료, 조리법 등 요리 관련 질문에 답변
+    예시: "나는 집에 소금이 없는데 어떻게해?"
+    """
+    try:
+        question = request.question.strip()
+        if not question:
+            return RecipeResponse(
+                success=False,
+                error="질문을 입력해주세요."
+            )
+        
+        logger.info(f"챗봇 질문: {question}")
+        
+        # LLM 호출을 위한 import
+        from app.graph.utils.llm_helpers import call_openai_api
+        from app.config import settings
+        
+        if not settings.OPENAI_API_KEY:
+            return RecipeResponse(
+                success=False,
+                error="OpenAI API 키가 설정되지 않았습니다."
+            )
+        
+        # 1단계: 요리 관련 질문인지 필터링
+        filter_messages = [
+            {
+                "role": "system",
+                "content": "당신은 요리 관련 질문을 판단하는 분류기입니다. 사용자의 질문이 요리, 재료, 조리법, 레시피, 대체재료 등 요리 관련 내용인지 판단하세요. 요리 관련이면 'yes', 그 외면 'no'로만 답변하세요."
+            },
+            {
+                "role": "user",
+                "content": f"다음 질문이 요리 관련 질문인가요? (요리, 재료, 조리법, 레시피, 대체재료 등)\n\n질문: {question}\n\n답변: (yes 또는 no만)"
+            }
+        ]
+        
+        try:
+            filter_response = call_openai_api(
+                messages=filter_messages,
+                model="gpt-4o-mini",
+                temperature=0.3
+            )
+            
+            # 필터링 결과 확인
+            is_cooking_related = "yes" in filter_response.lower().strip()
+            
+            if not is_cooking_related:
+                return RecipeResponse(
+                    success=False,
+                    error="요리 관련 질문만 답변 가능합니다. 요리, 재료, 조리법, 레시피에 관한 질문을 해주세요."
+                )
+        except Exception as e:
+            logger.error(f"필터링 오류: {e}")
+            # 필터링 실패 시 그냥 진행 (오류 방지)
+            pass
+        
+        # 2단계: 요리 관련 질문에 답변 생성
+        # 현재 만들고 있는 메뉴 정보를 컨텍스트로 추가
+        context_text = ""
+        if request.menu_name:
+            context_text = f"\n\n현재 사용자가 '{request.menu_name}'를 만들고 있습니다. 사용자의 질문이 이 메뉴와 관련된 것으로 이해하고 답변해주세요. 예를 들어, '{request.menu_name}을 만드는 과정에서 재료가 없으시군요' 같은 식으로 자연스럽게 언급하세요."
+        
+        answer_messages = [
+            {
+                "role": "system",
+                "content": f"""당신은 친절한 요리 챗봇입니다. 사용자의 요리 관련 질문에 대해 실용적이고 도움이 되는 답변을 제공하세요.
+
+특히 다음 상황에서 도움을 제공하세요:
+- 재료가 없을 때 대체재료 제안 (예: "소금이 없으면 간장이나 멸치 액젓으로 대체 가능합니다")
+- 조리법 궁금증 해결
+- 요리 중 발생하는 문제 해결
+- 레시피 관련 질문{context_text}
+
+답변은 간결하고 실용적으로, 한국 요리에 맞게 작성하세요."""
+            },
+            {
+                "role": "user",
+                "content": question
+            }
+        ]
+        
+        try:
+            answer = call_openai_api(
+                messages=answer_messages,
+                model="gpt-4o-mini",
+                temperature=0.7
+            )
+            
+            logger.info(f"챗봇 답변 생성 완료: {len(answer)}자")
+            
+            return RecipeResponse(
+                success=True,
+                data={
+                    "answer": answer,
+                    "question": question
+                }
+            )
+        except Exception as e:
+            logger.error(f"답변 생성 오류: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return RecipeResponse(
+                success=False,
+                error=f"답변 생성 중 오류가 발생했습니다: {str(e)}"
+            )
+    
+    except Exception as e:
+        import traceback
+        logger.error(f"챗봇 오류: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"챗봇 처리 중 오류가 발생했습니다: {str(e)}")
